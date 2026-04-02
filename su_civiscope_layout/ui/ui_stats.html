@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="UTF-8">
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
-      background-color: #f0f2f5;
+      background-color: #f5f5f5;
       color: #1a1a1a;
       margin: 0;
     }
@@ -136,7 +135,7 @@
       display: none;
     }
 
-    /* 全局空状态居中样式 */
+    /* 空状态居中对齐 */
     #global-empty {
       text-align: center;
       color: #999;
@@ -164,6 +163,35 @@
       border-bottom: 1px solid #eee;
       text-align: center;
     }
+  
+    .toolbar-btn {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 8px 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      transition: 0.2s;
+    }
+
+    .toolbar-btn:hover {
+      background: #f8f9fa;
+      border-color: #0056b3;
+      color: #0056b3;
+    }
+
+    .btn-site {
+      border-color: #28a745;
+      color: #28a745;
+    }
+
+    .btn-site:hover {
+      background: #f8f9fa;
+      border-color: #218838;
+      color: #218838;
+    }
   </style>
 </head>
 
@@ -174,55 +202,61 @@
     <div class="tab" id="btn-tab-site" onclick="userSwitchTab('tab-site')">🗺️ 用地</div>
   </div>
 
+  <div style="display:flex; gap:8px; padding: 10px; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 43px; z-index: 90;">
+    <button id="btn-pick" class="toolbar-btn" onclick="sketchup.start_picker(currentActiveTab === 'tab-bldg' ? 'bldg' : 'site')">🖌️ 建筑功能刷子</button>
+    <button id="btn-face-to-site" class="toolbar-btn btn-site" style="display:none; flex: 1.2;" onclick="sketchup.faces_to_sites()">🟩 面转地块</button>
+    <button id="btn-export" class="toolbar-btn" onclick="sketchup.export_data(currentActiveTab === 'tab-bldg' ? 'bldg' : 'site')">📊 导出表格</button>
+  </div>
+
   <div id="global-empty" class="view-box" style="display:block;">
-    👆 选择体块/面群组获取信息<br>
-    <span style="font-size:12px;color:#aaa;">(双击进入内部修改可实时监控)</span>
+    ℹ️<br>
+    <span style="font-size:12px;color:#aaa;">包含面或群组均可智能获取</span>
   </div>
 
   <div id="tab-bldg" class="tab-content active">
 
     <div id="bldg-normal" class="view-box card">
-      <p style="font-size:13px; text-align:center;">检测到普通闭合体块</p>
-      <button class="btn" onclick="sketchup.convert_bldg()">✨ 转化为 CIM体块</button>
+      <p style="font-size:13px; text-align:center;">该组件暂无CIM数据</p>
+      <button class="btn" onclick="sketchup.convert_bldg()">✨ 转换为CIM建筑</button>
     </div>
 
     <div id="bldg-bim" class="view-box">
       <div class="card">
-        <div class="title">体块设置<span class="id-badge" id="bldg-id">ID: --</span></div>
-        <div class="row"><span class="data-label">🏷️ 建筑编号</span><input type="text" id="bldg-no" placeholder="如: T1"
+        <div class="title">建筑信息 <span class="id-badge" id="bldg-id">ID: --</span></div>
+        <div class="row"><span class="data-label">编号：</span><input type="text" id="bldg-no" placeholder="如 A-01"
             onchange="updateBldg()"></div>
-        <div class="row"><span class="data-label">📐 标准层高 (m)</span><input type="number" id="bldg-h" step="0.1"
+        <div class="row"><span class="data-label">建筑层高(m)：</span><input type="number" id="bldg-h" step="0.1"
             onchange="updateBldg()"></div>
-        <div class="row"><span class="data-label">📌 建筑功能</span><select id="bldg-f" onchange="updateBldg()"></select>
+        <div class="row"><span class="data-label">建筑功能：</span><select id="bldg-f" onchange="updateBldg()"></select>
         </div>
       </div>
       <div class="card">
-        <div class="title">实时计算结果</div>
-        <div class="row"><span class="data-label">📏 总体高度:</span> <span class="data-value" id="bldg-th">0</span> m</div>
-        <div class="row"><span class="data-label">🔢 自动层数:</span> <span class="data-value" id="bldg-fc">0</span> 层</div>
-        <div class="row"><span class="data-label">👣 基底面积:</span> <span class="data-value" id="bldg-ba">0</span> m²
+        <div class="title">几何属性</div>
+        <div class="row"><span class="data-label">总高度：</span> <span class="data-value" id="bldg-th">0</span> m</div>
+        <div class="row"><span class="data-label">计算层数：</span> <span class="data-value" id="bldg-fc">0</span> 层</div>
+        <div class="row"><span class="data-label">基底面积：</span> <span class="data-value" id="bldg-ba">0</span> m²
         </div>
         <div class="row" style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-          <span style="font-weight:bold;">总建筑面积:</span><span class="highlight"><span id="bldg-area">0.00</span>
+          <span style="font-weight:bold;">建筑面积：</span><span class="highlight"><span id="bldg-area">0.00</span>
             m²</span>
         </div>
       </div>
     </div>
 
     <div id="bldg-multi" class="view-box card">
-      <div class="title" style="border-left-color: #28a745;">多体块汇总统计</div>
+      <div class="title" style="border-left-color: #28a745;">选中内容及数据汇总</div>
       <table class="multi-table">
         <thead>
           <tr>
             <th style="text-align:left;">编号</th>
             <th>功能</th>
-            <th style="text-align:right;">面积(m²)</th>
+            <th style="text-align:right;">建筑面积(m²)</th>
           </tr>
         </thead>
         <tbody id="bldg-list"></tbody>
       </table>
       <div class="row" style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
-        <span style="font-weight:bold; font-size:14px;">总计建筑面积:</span>
+        <span style="font-weight:bold; font-size:14px;">总建筑面积：</span>
         <span class="highlight" style="color: #28a745;"><span id="bldg-total">0.00</span> m²</span>
       </div>
     </div>
@@ -231,31 +265,31 @@
   <div id="tab-site" class="tab-content">
 
     <div id="site-normal" class="view-box card">
-      <p style="font-size:13px; text-align:center;">检测到普通面群组</p>
-      <button class="btn btn-green" onclick="sketchup.convert_site()">🗺️ 转化为 CIM地块</button>
+      <p style="font-size:13px; text-align:center;">该组件暂无地块数据</p>
+      <button class="btn btn-green" onclick="sketchup.convert_site()">✨ 转换为CIM地块</button>
     </div>
 
     <div id="site-bim" class="view-box">
       <div class="card">
-        <div class="title" style="border-left-color: #28a745;">地块设置<span class="id-badge" style="background:#28a745;"
+        <div class="title" style="border-left-color: #28a745;">地块信息 <span class="id-badge" style="background:#28a745;"
             id="site-id">ID: --</span></div>
-        <div class="row"><span class="data-label">🏷️ 地块编码</span><input type="text" id="site-no" placeholder="如: A-01"
+        <div class="row"><span class="data-label">编号：</span><input type="text" id="site-no" placeholder="如 A-01"
             onchange="updateSite()"></div>
-        <div class="row"><span class="data-label">🗂️ 地块类型</span><select id="site-t" onchange="updateSite()"></select>
+        <div class="row"><span class="data-label">大类：</span><select id="site-t" onchange="updateSite()"></select>
         </div>
-        <div class="row"><span class="data-label">📌 用地功能</span><select id="site-f" onchange="updateSite()"></select>
+        <div class="row"><span class="data-label">用地性质：</span><select id="site-f" onchange="updateSite()"></select>
         </div>
       </div>
       <div class="card">
-        <div class="title" style="border-left-color: #28a745;">实时计算结果</div>
+        <div class="title" style="border-left-color: #28a745;">几何属性</div>
         <div class="row" style="margin-top:10px;">
-          <span style="font-weight:bold;">总用地面积:</span><span class="highlight" style="color:#28a745;"><span
+          <span style="font-weight:bold;">投影面积：</span><span class="highlight" style="color: #28a745;"><span
               id="site-area">0.00</span> m²</span>
         </div>
       </div>
       <div class="card" id="site-bldgs-card" style="display:none;">
-        <div class="title" style="border-left-color: #17a2b8;">地块内包含的建筑</div>
-        <table class="multi-table" style="margin-bottom:0;">
+        <div class="title" style="border-left-color: #ffc107;">地块内包含的建筑实体</div>
+        <table class="multi-table" style="margin-bottom: 0;">
           <thead>
             <tr>
               <th style="text-align:left;">编号</th>
@@ -269,19 +303,19 @@
     </div>
 
     <div id="site-multi" class="view-box card">
-      <div class="title" style="border-left-color: #28a745;">多地块汇总统计</div>
+      <div class="title" style="border-left-color: #28a745;">多选地块数据汇总</div>
       <table class="multi-table">
         <thead>
           <tr>
-            <th style="text-align:left;">编码</th>
-            <th>类型</th>
+            <th style="text-align:left;">编号</th>
+            <th>大类</th>
             <th style="text-align:right;">面积(m²)</th>
           </tr>
         </thead>
         <tbody id="site-list"></tbody>
       </table>
       <div class="row" style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
-        <span style="font-weight:bold; font-size:14px;">总计用地面积:</span>
+        <span style="font-weight:bold; font-size:14px;">总占地面积：</span>
         <span class="highlight" style="color: #28a745;"><span id="site-total">0.00</span> m²</span>
       </div>
     </div>
@@ -292,9 +326,19 @@
 
     window.onload = function () {
       let topMargin = Math.max(0, (window.screen.availHeight - 550) / 2);
-      window.moveTo(80, topMargin);
+      window.moveTo(200, topMargin);
       sketchup.ready();
     };
+
+    function updateToolbarDisplay(tabId) {
+      if (tabId === 'tab-bldg') {
+        document.getElementById('btn-pick').innerText = "🖌️ 建筑功能刷子";
+        document.getElementById('btn-face-to-site').style.display = "none";
+      } else {
+        document.getElementById('btn-pick').innerText = "🖌️ 用地性质刷子";
+        document.getElementById('btn-face-to-site').style.display = "block";
+      }
+    }
 
     function userSwitchTab(tabId) {
       currentActiveTab = tabId;
@@ -302,6 +346,7 @@
       document.getElementById(tabId === 'tab-bldg' ? 'btn-tab-bldg' : 'btn-tab-site').classList.add('active');
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
+      updateToolbarDisplay(tabId);
       sketchup.on_tab_changed(tabId);
     }
 
@@ -312,16 +357,29 @@
         document.getElementById(tabId === 'tab-bldg' ? 'btn-tab-bldg' : 'btn-tab-site').classList.add('active');
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
+        updateToolbarDisplay(tabId);
       }
     }
 
     function updateBldg() { sketchup.apply_bldg(document.getElementById('bldg-h').value, document.getElementById('bldg-f').value, document.getElementById('bldg-no').value); }
-    function updateSite() { sketchup.apply_site(document.getElementById('site-t').value, document.getElementById('site-f').value, document.getElementById('site-no').value); }
-
+    function updateSite() { 
+      let st = document.getElementById('site-t');
+      let sf = document.getElementById('site-f').value;
+      
+      if(["公园绿地", "防护绿地", "广场用地", "绿地与广场用地"].includes(sf)) {
+        st.value = "绿地与广场用地";
+      } else if (sf === "水域") {
+        st.value = "水域";
+      } else {
+        st.value = "建设用地";
+      }
+      
+      sketchup.apply_site(st.value, sf, document.getElementById('site-no').value); 
+    }
     function buildOptions(arr, currentVal) {
       let str = "";
-      arr.forEach(val => { str += `<option value="${val}" ${(val === currentVal) ? "selected" : ""}>${val}</option>`; });
-      if (currentVal && !arr.includes(currentVal)) str += `<option value="${currentVal}" selected>${currentVal} (未知)</option>`;
+      arr.forEach(val => { str += `<option value="${val}" ${val === currentVal ? "selected" : ""}>${val}</option>`; });
+      if (currentVal && !arr.includes(currentVal)) { str += `<option value="${currentVal}" selected>${currentVal}(未匹配)</option>`; }
       return str;
     }
 
@@ -359,11 +417,11 @@
             let bHtml = "";
             let tArea = 0;
             data.bldgs.forEach(b => {
-              let dNo = b.no ? b.no : "<span style='color:#aaa'>未编号</span>";
+              let dNo = b.no ? b.no : "<span style='color:#aaa;'>无编号</span>";
               bHtml += `<tr><td style="text-align:left; color:#17a2b8;">${dNo}</td><td>${b.f}</td><td style="text-align:right; font-weight:bold;">${b.area}</td></tr>`;
               tArea += b.area;
             });
-            bHtml += `<tr><td colspan="2" style="text-align:right; color:#888;">汇总面积:</td><td style="text-align:right; color:#17a2b8; font-weight:bold;">${tArea.toFixed(2)}</td></tr>`;
+            bHtml += `<tr><td colspan="2" style="text-align:right; color:#888;">合计总建筑面积：</td><td style="text-align:right; color:#17a2b8; font-weight:bold;">${tArea.toFixed(2)}</td></tr>`;
             document.getElementById('site-bldgs-list').innerHTML = bHtml;
             document.getElementById('site-bldgs-card').style.display = 'block';
           } else {
@@ -376,7 +434,7 @@
         document.getElementById(`${type}-multi`).style.display = 'block';
         let listHtml = "";
         data.list.forEach(item => {
-          let displayNo = item.no ? item.no : "<span style='color:#aaa'>未编号</span>";
+          let displayNo = item.no ? item.no : "<span style='color:#aaa;'>无编号</span>";
           let label = type === 'bldg' ? item.f : item.t;
           listHtml += `<tr><td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td><td>${label}</td><td style="text-align:right; font-weight:bold;">${item.area}</td></tr>`;
         });

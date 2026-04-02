@@ -1,5 +1,7 @@
 # 编码：UTF-8
-module ArchcityLayout
+require 'json' unless defined?(JSON)
+
+module CiviscopeLayout
   module Core
 
     @dialog_settings = nil
@@ -23,6 +25,19 @@ module ArchcityLayout
       Sketchup.write_default(PLUGIN_NAME, key, arr.join("||"))
     end
 
+    def self.get_custom_colors
+      raw = Sketchup.read_default(PLUGIN_NAME, "custom_colors", "{}")
+      begin
+        JSON.parse(raw)
+      rescue
+        {}
+      end
+    end
+
+    def self.save_custom_colors(hash)
+      Sketchup.write_default(PLUGIN_NAME, "custom_colors", hash.to_json)
+    end
+
     # ==========================================
     # UI 弹窗与交互逻辑
     # ==========================================
@@ -31,7 +46,7 @@ module ArchcityLayout
         @dialog_settings.bring_to_front; return
       end
       
-      @dialog_settings = UI::HtmlDialog.new({:dialog_title=>"⚙️ 插件设置", :width=>400, :height=>450, :style=>UI::HtmlDialog::STYLE_DIALOG})
+      @dialog_settings = UI::HtmlDialog.new({:dialog_title=>"插件设置", :width=>460, :height=>600, :style=>UI::HtmlDialog::STYLE_DIALOG})
       @dialog_settings.set_file(File.join(__dir__, 'ui', 'ui_settings.html'))
       
       @dialog_settings.add_action_callback("ready") { self.refresh_settings_ui }
@@ -43,7 +58,7 @@ module ArchcityLayout
           arr << val
           self.save_custom_funcs(type, arr)
           self.refresh_settings_ui
-          self.refresh_stats_ui(Sketchup.active_model.selection) # 通知统计面板同步刷新
+          self.refresh_stats_ui(Sketchup.active_model.selection) 
         end
       end
       
@@ -51,7 +66,29 @@ module ArchcityLayout
         arr = self.get_custom_funcs(type)
         arr.delete(val)
         self.save_custom_funcs(type, arr)
+        
+        # 清理颜色残留
+        colors = self.get_custom_colors
+        if colors.delete(val)
+          self.save_custom_colors(colors)
+        end
+        
         self.refresh_settings_ui
+        self.refresh_stats_ui(Sketchup.active_model.selection)
+      end
+
+      @dialog_settings.add_action_callback("update_color") do |_, name, hex|
+        colors = self.get_custom_colors
+        colors[name] = hex
+        self.save_custom_colors(colors)
+        
+        # 自动更新现存材质实体
+        mat_name = "Civiscope_#{name}"
+        mat = Sketchup.active_model.materials[mat_name]
+        if mat
+          mat.color = hex
+        end
+        
         self.refresh_stats_ui(Sketchup.active_model.selection)
       end
 
@@ -61,7 +98,16 @@ module ArchcityLayout
 
     def self.refresh_settings_ui
       return unless @dialog_settings
-      @dialog_settings.execute_script("renderLists(#{DEFAULT_BLDG_FUNCS.to_json}, #{self.get_custom_funcs('bldg').to_json}, #{DEFAULT_SITE_FUNCS.to_json}, #{self.get_custom_funcs('site').to_json})")
+      
+      data = {
+        bldg: { defs: DEFAULT_BLDG_FUNCS, cust: self.get_custom_funcs('bldg') },
+        site: { defs: DEFAULT_SITE_FUNCS, cust: self.get_custom_funcs('site') },
+        types: SITE_TYPES,
+        colors: self.get_custom_colors,
+        fallback_colors: COLOR_MAP
+      }
+      
+      @dialog_settings.execute_script("renderLists(#{data.to_json})")
     end
 
   end

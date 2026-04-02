@@ -2,19 +2,19 @@
 require 'sketchup.rb'
 require 'json' 
 
-module ArchcityLayout
+module CiviscopeLayout
   module Core
     
     # ==========================================
     # 0. 全局常量与配置中心
     # ==========================================
-    PLUGIN_NAME = "Archcity_Layout"
+    PLUGIN_NAME = "Civiscope_Layout"
     VERSION = "beta 0.1.1"
     AUTHOR = "MaxExcelsior"
     
     DEFAULT_BLDG_FUNCS = ["办公", "商业", "居住", "公服设施", "市政设施", "交通设施"]
-    DEFAULT_SITE_FUNCS = ["居住用地", "商业用地", "中小学用地", "绿地与广场用地", "道路与交通用地"]
-    SITE_TYPES = ["建设用地", "绿地", "水域"]
+    DEFAULT_SITE_FUNCS = ["居住用地", "商业用地", "中小学用地", "绿地与广场用地", "道路与交通用地", "公园绿地", "防护绿地", "广场用地", "水域"]
+    SITE_TYPES = ["建设用地", "绿地与广场用地", "水域"]
 
     COLOR_MAP = {
       # 建筑颜色
@@ -22,12 +22,15 @@ module ArchcityLayout
       "公服设施" => [255, 223, 127], "市政设施" => [0, 138, 184], "交通设施" => [144, 144, 144],
       # 地块颜色
       "建设用地" => [252, 241, 217],
-      "绿地"     => [164, 228, 160], 
-      "水域"     => [143, 203, 246]  
+      "绿地与广场用地" => [164, 228, 160], 
+      "公园绿地" => [11, 250, 61], 
+      "防护绿地" => [0, 184, 0], 
+      "广场用地" => [217, 217, 217], 
+      "水域"     => [129, 255, 255]  
     }
 
     # ==========================================
-    # 1. 加载子功能模块 (顺序很重要)
+    # 1. 加载子功能模块(顺序很重要)
     # ==========================================
     require File.join(__dir__, 'settings.rb')
     require File.join(__dir__, 'stats.rb')
@@ -39,7 +42,7 @@ module ArchcityLayout
       load __FILE__
       load File.join(__dir__, 'settings.rb')
       load File.join(__dir__, 'stats.rb')
-      puts "=> Archcity Layout 代码重载完成!"
+      puts "=> Civiscope Layout 代码重载完成!"
       UI.messagebox("插件已重新加载！")
       return true
     end
@@ -61,20 +64,20 @@ module ArchcityLayout
     end
 
     # ==========================================
-    # 3. 注册工具栏 (Toolbar)
+    # 3. 注册工具条(Toolbar)
     # ==========================================
     unless file_loaded?(__FILE__)
-      toolbar = UI::Toolbar.new("Archcity Layout Tools")
+      toolbar = UI::Toolbar.new("Civiscope Layout Tools")
 
       # 工具1：统计
-      cmd1 = UI::Command.new("统计") { self.show_stats_dialog }
+      cmd1 = UI::Command.new("统计中心") { self.show_stats_dialog }
       cmd1.tooltip = "体块统计与参数设置"
       cmd1.small_icon = File.join(__dir__, 'icon', 'cal.svg') if File.exist?(File.join(__dir__, 'icon', 'cal.svg'))
       cmd1.large_icon = File.join(__dir__, 'icon', 'cal.svg') if File.exist?(File.join(__dir__, 'icon', 'cal.svg'))
       toolbar.add_item(cmd1)
 
       # 工具2：设置
-      cmd2 = UI::Command.new("设置") { self.show_settings_dialog }
+      cmd2 = UI::Command.new("偏好设置") { self.show_settings_dialog }
       cmd2.tooltip = "全局属性与分类设置"
       cmd2.small_icon = File.join(__dir__, 'icon', 'setting.svg') if File.exist?(File.join(__dir__, 'icon', 'setting.svg'))
       cmd2.large_icon = File.join(__dir__, 'icon', 'setting.svg') if File.exist?(File.join(__dir__, 'icon', 'setting.svg'))
@@ -88,7 +91,7 @@ module ArchcityLayout
       toolbar.add_item(cmd3)
 
       # 工具4：重载
-      cmd4 = UI::Command.new("重载") { self.reload }
+      cmd4 = UI::Command.new("重载代码") { self.reload }
       cmd4.tooltip = "重新加载插件代码 (开发用)"
       cmd4.small_icon = File.join(__dir__, 'icon', 'reload.svg') if File.exist?(File.join(__dir__, 'icon', 'reload.svg'))
       cmd4.large_icon = File.join(__dir__, 'icon', 'reload.svg') if File.exist?(File.join(__dir__, 'icon', 'reload.svg'))

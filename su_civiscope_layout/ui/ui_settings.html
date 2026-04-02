@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background-color: #fff; margin: 0; display: flex; height: 100vh;}
+    .sidebar { width: 100px; background: #f5f5f5; border-right: 1px solid #ddd; }
+    .nav-item { padding: 15px 10px; cursor: pointer; text-align: center; font-size: 13px; color: #555; transition: 0.2s; }
+    .nav-item:hover { background: #ebebeb; }
+    .nav-item.active { background: #fff; color: #0056b3; font-weight: bold; border-left: 3px solid #0056b3; }
+    .content { flex: 1; padding: 20px; overflow-y: auto; position: relative;}
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    h3 { margin-top: 0; font-size: 14px; color: #333; border-bottom: 2px solid #eee; padding-bottom: 8px; }
+    .list-item { display: flex; justify-content: space-between; align-items:center; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; transition: 0.2s; }
+    .list-item:hover { background: #fcfcfc; }
+    .list-item.default { color: #555; background: #fafafa; }
+    .btn-del { color: red; cursor: pointer; border: none; background: none; font-size: 12px; }
+    .btn-del:hover { text-decoration: underline; }
+    .add-box { margin-top: 15px; display: flex; }
+    .add-box input { flex: 1; padding: 6px 10px; border: 1px solid #ccc; outline: none; border-radius: 4px 0 0 4px; }
+    .add-box input:focus { border-color: #0056b3; }
+    .add-box button { background: #0056b3; color: white; border: none; padding: 0 15px; cursor: pointer; border-radius: 0 4px 4px 0; transition: 0.2s;}
+    .add-box button:hover { background: #004494; }
+
+    .color-box { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2); cursor: pointer; transition: 0.2s;}
+    .color-box:hover { transform: scale(1.15); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+    /* Custom Advanced Color Picker Popover */
+    #color-popover {
+      display: none; position: absolute; background: white; border-radius: 8px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2); padding: 15px; width: 240px; z-index: 1000; border: 1px solid #ddd;
+    }
+    .cp-tabs { display:flex; border-bottom:1px solid #eee; margin-bottom:12px;}
+    .cp-tab {flex:1; text-align:center; font-size:12px; padding:6px; cursor:pointer; color:#777; transition:0.2s;}
+    .cp-tab:hover { color: #333; }
+    .cp-tab.active { font-weight:bold; color:#0056b3; border-bottom:2px solid #0056b3;}
+    .cp-pane { display:none;}
+    .cp-pane.active { display:block;}
+    
+    .cp-slider-row { display:flex; align-items:center; margin-bottom: 10px;}
+    .cp-slider-row .cp-label { width: 15px; font-weight:bold; font-size:12px; color:#555;}
+    .cp-slider-row input[type="range"] { flex:1; margin:0 10px; cursor:pointer;}
+    .cp-slider-row input[type="number"] { width: 45px; border:1px solid #ccc; border-radius:4px; padding:3px; font-size:12px; text-align:center; font-family:monospace;}
+    
+    .cp-input { width:80px; border: 1px solid #ccc; border-radius: 4px; padding: 4px; font-family: monospace; font-size: 12px; text-align: center; }
+    .cp-actions { display: flex; gap: 8px; margin-top: 15px;}
+    .cp-btn { flex: 1; padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight:bold; transition: 0.2s;}
+    .cp-btn.primary { background: #0056b3; color: white; }
+    .cp-btn.primary:hover { background: #004494; }
+    .cp-btn.secondary { background: #f0f0f0; color: #333; }
+    .cp-btn.secondary:hover { background: #e0e0e0; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="nav-item active" onclick="switchTab('tab-building')">建筑配置</div>
+    <div class="nav-item" onclick="switchTab('tab-site')">用地配置</div>
+  </div>
+  <div class="content">
+    <div id="tab-building" class="tab-content active">
+      <h3 style="border-bottom-color: #0056b3;">建筑属性列表 (独立附带自定颜色)</h3>
+      <div id="bldg-func-list"></div>
+      <div class="add-box">
+        <input type="text" id="new-bldg-func" placeholder="输入自定义建筑功能...">
+        <button onclick="addFunc('bldg')">添加</button>
+      </div>
+    </div>
+    
+    <div id="tab-site" class="tab-content">
+      <h3 style="border-bottom-color: #28a745;">一、用地大类配置 (颜色统管全局)</h3>
+      <div id="site-type-list" style="margin-bottom: 20px;"></div>
+      
+      <h3 style="border-bottom-color: #28a745;">二、用地性质子条目</h3>
+      <div id="site-func-list"></div>
+      <div class="add-box">
+        <input type="text" id="new-site-func" placeholder="输入追加性质名称..." style="border-color:#28a745;">
+        <button onclick="addFunc('site')" style="background:#28a745;">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="color-popover">
+    <!-- 双面对比 -->
+    <div style="display:flex; height: 35px; border-radius: 6px; overflow:hidden; margin-bottom: 12px; border: 1px solid #ccc; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); position:relative;">
+       <div id="cp-preview-old" style="flex:1; border-right:1px solid rgba(255,255,255,0.2);" title="修改前的颜色"></div>
+       <div id="cp-preview-new" style="flex:1;" title="拖动滑块后的颜色"></div>
+       <div style="position:absolute; width:100%; text-align:center; line-height:35px; font-size:10px; color:rgba(255,255,255,0.8); pointer-events:none; font-weight:bold; mix-blend-mode:difference;">当前对比预期</div>
+    </div>
+    
+    <div class="cp-tabs">
+      <div class="cp-tab active" id="cptab-rgb" onclick="switchCpTab('rgb')">RGB 调节</div>
+      <div class="cp-tab" id="cptab-hsb" onclick="switchCpTab('hsb')">HSB 调节</div>
+    </div>
+    
+    <!-- RGB Pane -->
+    <div id="cppane-rgb" class="cp-pane active">
+       <div class="cp-slider-row">
+         <span class="cp-label">R</span>
+         <input type="range" id="cpr-r" min="0" max="255" oninput="slideRGB()">
+         <input type="number" id="cpi-r" min="0" max="255" oninput="inputRGB()">
+       </div>
+       <div class="cp-slider-row">
+         <span class="cp-label">G</span>
+         <input type="range" id="cpr-g" min="0" max="255" oninput="slideRGB()">
+         <input type="number" id="cpi-g" min="0" max="255" oninput="inputRGB()">
+       </div>
+       <div class="cp-slider-row">
+         <span class="cp-label">B</span>
+         <input type="range" id="cpr-b" min="0" max="255" oninput="slideRGB()">
+         <input type="number" id="cpi-b" min="0" max="255" oninput="inputRGB()">
+       </div>
+    </div>
+    
+    <!-- HSB Pane -->
+    <div id="cppane-hsb" class="cp-pane">
+       <div class="cp-slider-row">
+         <span class="cp-label">H</span>
+         <input type="range" id="cpr-h" min="0" max="360" oninput="slideHSB()">
+         <input type="number" id="cpi-h" min="0" max="360" oninput="inputHSB()">
+       </div>
+       <div class="cp-slider-row">
+         <span class="cp-label">S</span>
+         <input type="range" id="cpr-s" min="0" max="100" oninput="slideHSB()">
+         <input type="number" id="cpi-s" min="0" max="100" oninput="inputHSB()">
+       </div>
+       <div class="cp-slider-row">
+         <span class="cp-label">B</span>
+         <input type="range" id="cpr-br" min="0" max="100" oninput="slideHSB()">
+         <input type="number" id="cpi-br" min="0" max="100" oninput="inputHSB()">
+       </div>
+    </div>
+    
+    <!-- HEX Direct Input -->
+    <div style="margin-top:12px; display:flex; align-items:center; justify-content:center; gap:8px;">
+       <span style="font-size:12px; font-weight:bold; color:#777;">HEX 定制</span>
+       <input type="text" class="cp-input" id="cp-hex" oninput="cpPreviewHex()" placeholder="#FFFFFF">
+    </div>
+
+    <div class="cp-actions">
+      <button class="cp-btn primary" onclick="cpSave()">应用新色</button>
+      <button class="cp-btn secondary" onclick="cpClose()">取消</button>
+    </div>
+  </div>
+
+  <script>
+    let currentPayload = null;
+    let oldColorHex = null;
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      event.target.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      cpClose();
+    }
+    
+    function switchCpTab(mode) {
+      document.querySelectorAll('.cp-tab').forEach(el => el.classList.remove('active'));
+      document.getElementById(`cptab-${mode}`).classList.add('active');
+      document.querySelectorAll('.cp-pane').forEach(el => el.classList.remove('active'));
+      document.getElementById(`cppane-${mode}`).classList.add('active');
+    }
+
+    function rgbToHexNative(r, g, b) {
+      return "#" + ((1 << 24) + (Number(r) << 16) + (Number(g) << 8) + Number(b)).toString(16).slice(1).toUpperCase();
+    }
+
+    function resolveHex(name, data) {
+      if (data.colors[name]) return data.colors[name];
+      if (data.fallback_colors[name]) {
+         let cr = data.fallback_colors[name];
+         return rgbToHexNative(cr[0], cr[1], cr[2]);
+      }
+      return "#C0C0C0"; 
+    }
+
+    function renderLists(payload) {
+      currentPayload = payload;
+      let bDefs = payload.bldg.defs;
+      let bCust = payload.bldg.cust;
+      let sDefs = payload.site.defs;
+      let sCust = payload.site.cust;
+      let types = payload.types;
+
+      // 建筑部分
+      let bHtml = '';
+      bDefs.forEach(f => {
+        let hex = resolveHex(f, payload);
+        bHtml += `<div class="list-item default">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div id="cbox_bldg_${encodeURIComponent(f)}" class="color-box" style="background:${hex};" onclick="openColor('${f}', '${hex}', this, 'bldg')"></div>
+                      <span>${f}</span>
+                    </div>
+                    <span style="color:#aaa;font-size:12px;">(内置)</span>
+                  </div>`; 
+      });
+      bCust.forEach(f => { 
+        let hex = resolveHex(f, payload);
+        bHtml += `<div class="list-item">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div id="cbox_bldg_${encodeURIComponent(f)}" class="color-box" style="background:${hex};" onclick="openColor('${f}', '${hex}', this, 'bldg')"></div>
+                      <span>${f}</span>
+                    </div>
+                    <button class="btn-del" onclick="delFunc('bldg', '${f}')">× 删除</button>
+                  </div>`; 
+      });
+      document.getElementById('bldg-func-list').innerHTML = bHtml;
+
+      // 用地大类部分 (支持提取颜色)
+      let tHtml = '';
+      types.forEach(t => {
+        let hex = resolveHex(t, payload);
+        tHtml += `<div class="list-item default" style="background:#f0faf2; border-color:#e0eedf;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div id="cbox_type_${encodeURIComponent(t)}" class="color-box" style="background:${hex}; border-color:#888;" onclick="openColor('${t}', '${hex}', this, 'type')"></div>
+                      <span style="font-weight:bold; color:#218838;">${t}</span>
+                    </div>
+                    <span style="color:#218838;font-size:12px;">(原生大类)</span>
+                  </div>`;
+      });
+      document.getElementById('site-type-list').innerHTML = tHtml;
+
+      // 用地性质部分 (不具有单独改色的框框，跟随大类)
+      let sHtml = '';
+      sDefs.forEach(f => { 
+        sHtml += `<div class="list-item default">
+                    <div style="padding-left: 26px;">${f}</div>
+                    <span style="color:#aaa;font-size:12px;">(内置性质)</span>
+                  </div>`; 
+      });
+      sCust.forEach(f => { 
+        sHtml += `<div class="list-item">
+                    <div style="padding-left: 26px;">${f}</div>
+                    <button class="btn-del" onclick="delFunc('site', '${f}')">× 删除</button>
+                  </div>`; 
+      });
+      document.getElementById('site-func-list').innerHTML = sHtml;
+    }
+
+    function addFunc(type) {
+      let val = document.getElementById(`new-${type}-func`).value.trim();
+      if(val) { 
+        sketchup.add_custom_func(type, val); 
+        document.getElementById(`new-${type}-func`).value = ''; 
+      }
+    }
+    function delFunc(type, f) { sketchup.del_custom_func(type, f); }
+    window.onload = function() { sketchup.ready(); };
+
+    // ==========================================
+    // 高级 HSB/RGB 双重拾色引擎
+    // ==========================================
+    let currentEditingName = null;
+    let currentEditingPrefix = null;
+    let currentColorHex = "#000000";
+
+    function hexToRgb(hex) {
+      let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+    }
+    function rgbToHsb(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      let max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h, s, v = max;
+      let d = max - min;
+      s = max == 0 ? 0 : d / max;
+      if (max == min) { h = 0;} else {
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return { h: Math.round(h * 360), s: Math.round(s * 100), b: Math.round(v * 100) };
+    }
+    function hsbToRgb(h, s, v) {
+      h /= 360; s /= 100; v /= 100;
+      let r, g, b;
+      let i = Math.floor(h * 6);
+      let f = h * 6 - i;
+      let p = v * (1 - s);
+      let q = v * (1 - f * s);
+      let t = v * (1 - (1 - f) * s);
+      switch (i % 6) {
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
+      }
+      return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+    }
+
+    function updateSliders(hex) {
+      let rgb = hexToRgb(hex);
+      if(!rgb) return;
+      document.getElementById('cpr-r').value = rgb.r; document.getElementById('cpi-r').value = rgb.r;
+      document.getElementById('cpr-g').value = rgb.g; document.getElementById('cpi-g').value = rgb.g;
+      document.getElementById('cpr-b').value = rgb.b; document.getElementById('cpi-b').value = rgb.b;
+      
+      let hsb = rgbToHsb(rgb.r, rgb.g, rgb.b);
+      document.getElementById('cpr-h').value = hsb.h; document.getElementById('cpi-h').value = hsb.h;
+      document.getElementById('cpr-s').value = hsb.s; document.getElementById('cpi-s').value = hsb.s;
+      document.getElementById('cpr-br').value = hsb.b; document.getElementById('cpi-br').value = hsb.b;
+      
+      document.getElementById('cp-hex').value = hex.toUpperCase();
+      document.getElementById('cp-preview-new').style.background = hex;
+      currentColorHex = hex;
+    }
+
+    function slideRGB() {
+      let r = document.getElementById('cpr-r').value;
+      let g = document.getElementById('cpr-g').value;
+      let b = document.getElementById('cpr-b').value;
+      updateSliders(rgbToHexNative(r,g,b));
+    }
+    function inputRGB() {
+      let r = Math.min(255, Math.max(0, parseInt(document.getElementById('cpi-r').value)||0));
+      let g = Math.min(255, Math.max(0, parseInt(document.getElementById('cpi-g').value)||0));
+      let b = Math.min(255, Math.max(0, parseInt(document.getElementById('cpi-b').value)||0));
+      updateSliders(rgbToHexNative(r,g,b));
+    }
+    function slideHSB() {
+      let h = document.getElementById('cpr-h').value;
+      let s = document.getElementById('cpr-s').value;
+      let br = document.getElementById('cpr-br').value;
+      let rgb = hsbToRgb(h,s,br);
+      updateSliders(rgbToHexNative(rgb.r,rgb.g,rgb.b));
+    }
+    function inputHSB() {
+      let h = Math.min(360, Math.max(0, parseInt(document.getElementById('cpi-h').value)||0));
+      let s = Math.min(100, Math.max(0, parseInt(document.getElementById('cpi-s').value)||0));
+      let br = Math.min(100, Math.max(0, parseInt(document.getElementById('cpi-br').value)||0));
+      let rgb = hsbToRgb(h,s,br);
+      updateSliders(rgbToHexNative(rgb.r,rgb.g,rgb.b));
+    }
+    function cpPreviewHex() {
+      let v = document.getElementById('cp-hex').value;
+      if(!v.startsWith('#')) v = '#' + v;
+      if(/^#[0-9A-F]{6}$/i.test(v)) updateSliders(v);
+    }
+
+    function openColor(name, currentHex, btnElement, prefix) {
+      currentEditingName = name;
+      currentEditingPrefix = prefix;
+      oldColorHex = currentHex;
+      
+      document.getElementById('cp-preview-old').style.background = oldColorHex;
+      updateSliders(currentHex);
+
+      let pop = document.getElementById('color-popover');
+      let rect = btnElement.getBoundingClientRect();
+      
+      let topPos = rect.bottom + 10;
+      let leftPos = rect.left;
+      
+      if(leftPos + 240 > window.innerWidth) leftPos = window.innerWidth - 260;
+      if(topPos + 260 > window.innerHeight) topPos = rect.top - 270;
+
+      pop.style.top = topPos + 'px';
+      pop.style.left = leftPos + 'px';
+      pop.style.display = 'block';
+    }
+
+    function cpClose() {
+      document.getElementById('color-popover').style.display = 'none';
+      currentEditingName = null;
+    }
+
+    function cpSave() {
+      if(!currentEditingName) return;
+      sketchup.update_color(currentEditingName, currentColorHex);
+      
+      if(currentPayload) currentPayload.colors[currentEditingName] = currentColorHex;
+      let box = document.getElementById(`cbox_${currentEditingPrefix}_${encodeURIComponent(currentEditingName)}`);
+      if(box) box.style.background = currentColorHex;
+      
+      cpClose();
+    }
+  </script>
+</body>
+</html>
