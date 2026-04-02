@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: "Segoe UI", sans-serif; background-color: #fff; margin: 0; display: flex; height: 100vh;}
+    .sidebar { width: 100px; background: #f5f5f5; border-right: 1px solid #ddd; }
+    .nav-item { padding: 15px 10px; cursor: pointer; text-align: center; font-size: 13px; color: #555; }
+    .nav-item.active { background: #fff; color: #0056b3; font-weight: bold; border-left: 3px solid #0056b3; }
+    .content { flex: 1; padding: 20px; overflow-y: auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    h3 { margin-top: 0; font-size: 16px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    .list-item { display: flex; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+    .list-item.default { color: #888; background: #fafafa; }
+    .btn-del { color: red; cursor: pointer; border: none; background: none; }
+    .add-box { margin-top: 15px; display: flex; }
+    .add-box input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px 0 0 4px; }
+    .add-box button { background: #0056b3; color: white; border: none; padding: 0 15px; cursor: pointer; border-radius: 0 4px 4px 0; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="nav-item active" onclick="switchTab('tab-building')">🏢 建筑</div>
+    <div class="nav-item" onclick="switchTab('tab-site')">🗺️ 用地</div>
+  </div>
+  <div class="content">
+    <div id="tab-building" class="tab-content active">
+      <h3>建筑功能选项管理</h3>
+      <div id="func-list"></div>
+      <div class="add-box">
+        <input type="text" id="new-func" placeholder="输入自定义功能...">
+        <button onclick="addFunc()">添加</button>
+      </div>
+    </div>
+    <div id="tab-site" class="tab-content">
+      <h3>用地设置</h3>
+      <p style="color:#888; font-size:13px;">功能开发中...</p>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      event.target.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+    }
+    function renderFuncs(defaults, customs) {
+      let html = '';
+      defaults.forEach(f => { html += `<div class="list-item default"><span>${f}</span> <span>(默认不可改)</span></div>`; });
+      customs.forEach(f => { html += `<div class="list-item"><span>${f}</span> <button class="btn-del" onclick="delFunc('${f}')">✕ 删除</button></div>`; });
+      document.getElementById('func-list').innerHTML = html;
+    }
+    function addFunc() {
+      let val = document.getElementById('new-func').value.trim();
+      if(val) { sketchup.add_custom_func(val); document.getElementById('new-func').value = ''; }
+    }
+    function delFunc(f) { sketchup.del_custom_func(f); }
+    window.onload = function() { sketchup.ready(); };
+  </script>
+</body>
+</html>
