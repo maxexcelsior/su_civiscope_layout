@@ -459,7 +459,74 @@ module CiviscopeLayout
         entity.set_attribute("dynamic_attributes", "base_area", b_area.to_s)
         entity.set_attribute("dynamic_attributes", "total_height", th_m.to_s)
         
+        self.class_variable_set(:@@skip_observer, true)
+        begin
+          self.update_floor_lines(entity, fc, fh)
+        ensure
+          self.class_variable_set(:@@skip_observer, false)
+        end
+        
         model.commit_operation unless skip_operation
+      end
+    end
+
+    def self.update_floor_lines(entity, floor_count, floor_height_m)
+      ents = (entity.is_a?(Sketchup::ComponentInstance) || entity.is_a?(Sketchup::Group)) ? entity.definition.entities : nil
+      return unless ents
+
+      old_lines = ents.grep(Sketchup::Edge).select { |e| e.get_attribute("civiscope", "is_floor_line") }
+      ents.erase_entities(old_lines) if old_lines.any?
+
+      floor_count = floor_count.to_i
+      return if floor_count <= 1
+
+      vertex_zs = ents.grep(Sketchup::Edge).flat_map { |e| [e.start.position.z, e.end.position.z] }
+      return if vertex_zs.empty?
+      
+      min_z = vertex_zs.min
+      max_z = vertex_zs.max
+      
+      base_faces = ents.grep(Sketchup::Face).select do |f|
+        f.normal.z < -0.99 && (f.bounds.min.z - min_z).abs < 0.001
+      end
+      
+      if base_faces.empty?
+        base_edges = ents.grep(Sketchup::Edge).select do |e|
+          (e.start.position.z - min_z).abs < 0.001 && (e.end.position.z - min_z).abs < 0.001
+        end
+      else
+        base_edges = base_faces.flat_map(&:edges).uniq
+        base_edges.select! do |e|
+          (e.start.position.z - min_z).abs < 0.001 && (e.end.position.z - min_z).abs < 0.001
+        end
+      end
+
+      base_edges.select! do |e|
+        faces = e.faces
+        base_face_count = faces.count { |f| f.normal.z.abs > 0.99 && (f.bounds.min.z - min_z).abs < 0.001 }
+        base_face_count < 2 
+      end
+
+      return if base_edges.empty?
+
+      local_scale_z = entity.transformation.zscale
+      local_fh_inch = (floor_height_m / 0.0254) / local_scale_z
+      
+      (1...floor_count).each do |i|
+        z_offset = i * local_fh_inch
+        cur_z = min_z + z_offset
+        
+        break if (max_z - cur_z) < 0.1
+        
+        base_edges.each do |e|
+          pt1 = e.start.position
+          pt2 = e.end.position
+          p1 = Geom::Point3d.new(pt1.x, pt1.y, cur_z)
+          p2 = Geom::Point3d.new(pt2.x, pt2.y, cur_z)
+          
+          line = ents.add_line(p1, p2)
+          line.set_attribute("civiscope", "is_floor_line", true) if line
+        end
       end
     end
 
@@ -485,7 +552,10 @@ module CiviscopeLayout
     end
 
     class MassingEntityObserver < Sketchup::EntityObserver
-      def onChangeEntity(e); CiviscopeLayout::Core.schedule_update(e); end
+      def onChangeEntity(e)
+        return if CiviscopeLayout::Core.class_variable_defined?(:@@skip_observer) && CiviscopeLayout::Core.class_variable_get(:@@skip_observer)
+        CiviscopeLayout::Core.schedule_update(e)
+      end
       def onEraseEntity(e)
         CiviscopeLayout::Core.refresh_stats_ui(Sketchup.active_model.selection)
       end
