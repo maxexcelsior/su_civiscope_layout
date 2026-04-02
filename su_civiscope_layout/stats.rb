@@ -62,6 +62,15 @@ module CiviscopeLayout
       @dialog_stats = UI::HtmlDialog.new({:dialog_title => "📊 统计中心", :width => 320, :height => 550, :style => UI::HtmlDialog::STYLE_DIALOG})
       @dialog_stats.set_file(File.join(__dir__, 'ui', 'ui_stats.html'))
       
+      # Ensure overlay is registered
+      @overlay ||= CiviscopeHeightCheckOverlay.new
+      begin
+        Sketchup.active_model.overlays.add(@overlay)
+      rescue => e
+        # Might already be added or not supported
+      end
+      
+      
       @dialog_stats.add_action_callback("on_tab_changed") do |_, tab_id|
         @current_active_tab = tab_id
         @is_tab_switch = true
@@ -70,9 +79,10 @@ module CiviscopeLayout
       end
 
       @dialog_stats.add_action_callback("convert_bldg") { self.do_convert_bldg }
-      @dialog_stats.add_action_callback("apply_bldg") { |_, h, f, no| self.do_apply_bldg(h, f, no) }
+      @dialog_stats.add_action_callback("apply_bldg") { |_, h, f, no, type, th| self.do_apply_bldg(h, f, no, type, th) }
       @dialog_stats.add_action_callback("convert_site") { self.do_convert_site }
-      @dialog_stats.add_action_callback("apply_site") { |_, t, f, no| self.do_apply_site(t, f, no) }
+      @dialog_stats.add_action_callback("apply_site") { |_, t, f, no, hl| self.do_apply_site(t, f, no, hl) }
+      @dialog_stats.add_action_callback("toggle_height_check") { |_, id| self.do_toggle_height_check(id) }
       @dialog_stats.add_action_callback("start_picker") { |_, mode| Sketchup.active_model.select_tool(FunctionPickerTool.new(mode)) }
       @dialog_stats.add_action_callback("export_data") { |_, mode| UI.messagebox((mode == 'bldg' ? "建筑" : "用地") + "导出表单功能开发中...") }
       @dialog_stats.add_action_callback("faces_to_sites") { self.do_faces_to_sites }
@@ -148,7 +158,8 @@ module CiviscopeLayout
             th: t.get_attribute("dynamic_attributes", "total_height"),
             fc: t.get_attribute("dynamic_attributes", "floor_count"),
             ba: t.get_attribute("dynamic_attributes", "base_area"),
-            area: t.get_attribute("dynamic_attributes", "bldg_area")
+            area: t.get_attribute("dynamic_attributes", "bldg_area"),
+            type: t.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
           })
           @dialog_stats.execute_script("refreshUI('bldg', 'bim', [], #{all_funcs.to_json}, #{data.to_json})")
         else
@@ -157,6 +168,7 @@ module CiviscopeLayout
             t: t.get_attribute("dynamic_attributes", "site_type"),
             f: t.get_attribute("dynamic_attributes", "site_func"),
             area: t.get_attribute("dynamic_attributes", "site_area"),
+            hl: t.get_attribute("dynamic_attributes", "height_limit") || "0",
             bldgs: bldgs_in_site
           })
           @dialog_stats.execute_script("refreshUI('site', 'bim', #{SITE_TYPES.to_json}, #{all_funcs.to_json}, #{data.to_json})")
@@ -199,11 +211,13 @@ module CiviscopeLayout
         
         if self.point_in_site_vertical?(bottom_center, site)
           area = bldg.get_attribute("dynamic_attributes", "bldg_area").to_f || 0.0
+          base_area = bldg.get_attribute("dynamic_attributes", "base_area").to_f || 0.0
           bldgs << { 
             id: self.get_short_id(bldg), 
             no: bldg.get_attribute("dynamic_attributes", "bldg_no") || "",
             f: bldg.get_attribute("dynamic_attributes", "bldg_func") || "",
-            area: area.round(2)
+            area: area.round(2),
+            base_area: base_area.round(2)
           }
         end
       end
@@ -346,6 +360,7 @@ module CiviscopeLayout
         inst.set_attribute("dynamic_attributes", "_formatversion", 1.0)
         inst.set_attribute("dynamic_attributes", "floor_height", "3.0")
         inst.set_attribute("dynamic_attributes", "bldg_func", DEFAULT_BLDG_FUNCS[0])
+        inst.set_attribute("dynamic_attributes", "bldg_type", "塔楼")
         inst.set_attribute("dynamic_attributes", "bldg_no", "") 
         
         self.attach_observers(inst)
@@ -359,14 +374,28 @@ module CiviscopeLayout
       model.commit_operation
     end
 
-    def self.do_apply_bldg(h, f, no)
+    def self.do_apply_bldg(h, f, no, type = nil, th = nil)
       model = Sketchup.active_model
-      model.start_operation('转换为CIM建筑', true)
+      model.start_operation('修改建筑属性', true)
       model.selection.to_a.each do |inst|
         next unless inst.get_attribute("dynamic_attributes", "bldg_func")
+        
+        cur_th = inst.get_attribute("dynamic_attributes", "total_height").to_f
+        req_th = th.to_f
+        
+        if req_th > 0 && cur_th > 0 && (cur_th - req_th).abs > 0.01
+          inst.make_unique if inst.is_a?(Sketchup::ComponentInstance)
+          scale_z = req_th / cur_th
+          bnd = inst.bounds
+          base_pt = Geom::Point3d.new(bnd.center.x, bnd.center.y, bnd.min.z)
+          tr = Geom::Transformation.scaling(base_pt, 1.0, 1.0, scale_z)
+          inst.transform!(tr)
+        end
+        
         inst.set_attribute("dynamic_attributes", "floor_height", h.to_s)
         inst.set_attribute("dynamic_attributes", "bldg_func", f.to_s)
         inst.set_attribute("dynamic_attributes", "bldg_no", no.to_s)
+        inst.set_attribute("dynamic_attributes", "bldg_type", type.to_s) if type
         self.auto_recalculate(inst, true, true) 
       end
       self.refresh_stats_ui(model.selection)
@@ -399,18 +428,102 @@ module CiviscopeLayout
       model.commit_operation
     end
 
-    def self.do_apply_site(t, f, no)
+    def self.do_apply_site(t, f, no, hl)
       model = Sketchup.active_model
-      model.start_operation('修改建筑功能', true)
+      model.start_operation('修改地块属性', true)
       model.selection.to_a.each do |inst|
         next unless inst.get_attribute("dynamic_attributes", "site_func")
         inst.set_attribute("dynamic_attributes", "site_type", t.to_s)
         inst.set_attribute("dynamic_attributes", "site_func", f.to_s)
         inst.set_attribute("dynamic_attributes", "site_no", no.to_s)
+        inst.set_attribute("dynamic_attributes", "height_limit", hl.to_s)
         self.auto_recalculate(inst, true, true) 
       end
       self.refresh_stats_ui(model.selection)
       model.commit_operation
+    end
+
+    def self.do_toggle_height_check(id_str)
+      puts "[Civiscope] Toggling height check for ID: #{id_str}"
+      model = Sketchup.active_model
+      
+      # Robust search using persistent_id then short_id fallback
+      id_int = id_str.to_i
+      site = model.find_entity_by_persistent_id(id_int)
+      site ||= model.entities.to_a.find { |e| self.get_short_id(e) == id_str }
+      
+      unless site
+        puts "[Civiscope] Site not found in model entities list"
+        return 
+      end
+      
+      # Check and Re-register Overlay (robustness)
+      @overlay ||= CiviscopeHeightCheckOverlay.new
+      begin
+        model.overlays.add(@overlay) unless model.overlays.to_a.include?(@overlay)
+      rescue => e
+        puts "[Civiscope] Error adding overlay: #{e.message}"
+      end
+      
+      # Clean up old version groups if any
+      check_name = "CIM_HeightCheck_#{id_str}"
+      existing = model.entities.grep(Sketchup::Group).find { |g| g.name == check_name }
+      if existing
+        existing.locked = false
+        existing.erase!
+      end
+      
+      # Toggle Overlay State
+      @overlay ||= CiviscopeHeightCheckOverlay.new
+      if @overlay.sites_data.key?(id_str)
+        @overlay.sites_data.delete(id_str)
+      else
+        limit_m = site.get_attribute("dynamic_attributes", "height_limit").to_f
+        return if limit_m <= 0
+        
+        # Get face profile
+        definition = site.is_a?(Sketchup::Group) ? site.definition : site.definition
+        face = definition.entities.grep(Sketchup::Face).first
+        if face
+          tr = site.respond_to?(:world_transformation) ? site.world_transformation : site.transformation
+          pts = face.outer_loop.vertices.map { |v| v.position.transform(tr) }
+          @overlay.sites_data[id_str] = {
+            pts: pts,
+            limit_m: limit_m,
+            site_min_z: site.bounds.min.z,
+            violated: false
+          }
+          self.update_overlay_state(id_str)
+          puts "[Civiscope] Overlay data added for #{id_str}. Box pts: #{pts.length}"
+        else
+          puts "[Civiscope] Error: Site contains no valid face for profile"
+        end
+      end
+      model.view.invalidate
+    end
+
+    def self.update_overlay_state(id_str)
+      return unless @overlay && @overlay.sites_data[id_str]
+      data = @overlay.sites_data[id_str]
+      
+      model = Sketchup.active_model
+      site = model.entities.to_a.find { |e| self.get_short_id(e) == id_str }
+      return unless site
+      
+      bldgs = self.find_buildings_on_site(site)
+      is_violated = false
+      site_min_z = data[:site_min_z]
+      limit_inch = data[:limit_m] / 0.0254
+      
+      bldgs.each do |b_data|
+        b_ent = model.entities.to_a.find { |e| self.get_short_id(e) == b_data[:id] }
+        if b_ent && b_ent.bounds.max.z > site_min_z + limit_inch + 0.001
+          is_violated = true
+          break
+        end
+      end
+      
+      data[:violated] = is_violated
     end
 
     def self.auto_recalculate(entity, skip_ui_refresh = false, skip_operation = false)
@@ -420,11 +533,32 @@ module CiviscopeLayout
         bldg_func = entity.get_attribute("dynamic_attributes", "bldg_func")
         self.apply_material(entity, bldg_func)
         self.calc_bldg_data(entity, skip_operation)
+        
+        # Real-time height check update for Overlays
+        if @overlay && @overlay.respond_to?(:sites_data)
+          @overlay.sites_data.keys.each do |site_id|
+            site = Sketchup.active_model.entities.to_a.find { |e| self.get_short_id(e) == site_id }
+            if site
+              bldgs = self.find_buildings_on_site(site)
+              if bldgs.any? { |b| b[:id] == self.get_short_id(entity) }
+                self.update_overlay_state(site_id)
+                Sketchup.active_model.view.invalidate
+              end
+            end
+          end
+        end
       elsif entity.get_attribute("dynamic_attributes", "site_func")
         site_func = entity.get_attribute("dynamic_attributes", "site_func")
         site_type = entity.get_attribute("dynamic_attributes", "site_type") || site_func
         self.apply_material(entity, site_func, site_type)
         self.calc_site_data(entity, skip_operation)
+        
+        # Real-time height check update for Overlay
+        id_str = self.get_short_id(entity)
+        if @overlay && @overlay.sites_data.key?(id_str)
+          self.update_overlay_state(id_str)
+          Sketchup.active_model.view.invalidate
+        end
       end
       
       self.refresh_stats_ui(Sketchup.active_model.selection) unless skip_ui_refresh
@@ -440,8 +574,8 @@ module CiviscopeLayout
       fc = th_m > 0 ? (th_m / fh).floor : 0
       
       vol_m3 = entity.volume * (0.0254 ** 3)
-      t_area = (vol_m3 / fh).round(2)
       b_area = th_m > 0 ? (vol_m3 / th_m).round(2) : 0
+      t_area = (fc * b_area).round(2)
 
       bldg_func = entity.get_attribute("dynamic_attributes", "bldg_func")
 
@@ -471,6 +605,17 @@ module CiviscopeLayout
     end
 
     def self.update_floor_lines(entity, floor_count, floor_height_m)
+      # Ensure the entity is unique if it's a component or group with multiple instances
+      # so that modifying its definition doesn't affect other instances.
+      if entity.respond_to?(:make_unique)
+        begin
+          # SketchUp automatically handles whether it needs to be made unique
+          entity.make_unique 
+        rescue
+          # Some older versions or specific states might throw, ignore safely
+        end
+      end
+
       ents = (entity.is_a?(Sketchup::ComponentInstance) || entity.is_a?(Sketchup::Group)) ? entity.definition.entities : nil
       return unless ents
 
@@ -512,7 +657,7 @@ module CiviscopeLayout
       local_scale_z = entity.transformation.zscale
       local_fh_inch = (floor_height_m / 0.0254) / local_scale_z
       
-      (1...floor_count).each do |i|
+      (1..floor_count).each do |i|
         z_offset = i * local_fh_inch
         cur_z = min_z + z_offset
         
@@ -614,11 +759,27 @@ module CiviscopeLayout
         @picked_type = nil 
         
         icon_dir = File.join(__dir__, 'icon')
-        pick_path = File.join(icon_dir, 'picker.png')
-        paint_path = File.join(icon_dir, 'paint.png')
+        pick_svg = File.join(icon_dir, 'picker.svg')
+        paint_svg = File.join(icon_dir, 'paint.svg')
+        pick_png = File.join(icon_dir, 'picker.png')
+        paint_png = File.join(icon_dir, 'paint.png')
         
-        @cursor_pick = File.exist?(pick_path) ? UI.create_cursor(pick_path, 0, 0) : 632 
-        @cursor_paint = File.exist?(paint_path) ? UI.create_cursor(paint_path, 0, 0) : 636
+        # Use SVG if available for better DPI scaling, otherwise fallback to PNG or ID
+        if File.exist?(pick_svg)
+          @cursor_pick = UI.create_cursor(pick_svg, 4, 26)
+        elsif File.exist?(pick_png)
+          @cursor_pick = UI.create_cursor(pick_png, 0, 0)
+        else
+          @cursor_pick = 632
+        end
+
+        if File.exist?(paint_svg)
+          @cursor_paint = UI.create_cursor(paint_svg, 4, 26)
+        elsif File.exist?(paint_png)
+          @cursor_paint = UI.create_cursor(paint_png, 0, 0)
+        else
+          @cursor_paint = 636
+        end
       end
 
       def onSetCursor
@@ -730,5 +891,54 @@ module CiviscopeLayout
       end
     end
 
+    # --- Overlay Class ---
+    class CiviscopeHeightCheckOverlay < Sketchup::Overlay
+      attr_accessor :sites_data
+      
+      def initialize
+        super('civiscope_height_check', '地块限高检测图层')
+        @sites_data = {} # {id => {pts: [], limit_m: 0, violated: bool, site_min_z: 0}}
+      end
+      
+      def draw(view)
+        @sites_data.each do |id, data|
+          pts = data[:pts]
+          limit_inch = data[:limit_m] / 0.0254
+          is_violated = data[:violated]
+          
+          # Color Setup
+          color = is_violated ? Sketchup::Color.new(255, 0, 0, 70) : Sketchup::Color.new(150, 150, 150, 70)
+          edge_color = is_violated ? Sketchup::Color.new(255, 0, 0, 150) : Sketchup::Color.new(100, 100, 100, 150)
+          
+          # Generate 3D Box geometry for rendering
+          top_pts = pts.map { |p| p.offset([0, 0, limit_inch]) }
+          
+          # Draw Side Faces
+          pts.each_with_index do |p, i|
+            p2 = pts[(i + 1) % pts.length]
+            t1 = top_pts[i]
+            t2 = top_pts[(i + 1) % top_pts.length]
+            
+            view.drawing_color = color
+            view.draw(GL_QUADS, p, p2, t2, t1)
+            
+            # Edges
+            view.drawing_color = edge_color
+            view.line_width = 1
+            view.draw(GL_LINE_STRIP, p, p2, t2, t1, p)
+          end
+          
+          # Draw Top Face
+          view.drawing_color = color
+          view.draw(GL_POLYGON, top_pts)
+          
+          # Top Edges
+          view.drawing_color = edge_color
+          view.draw(GL_LINE_LOOP, top_pts)
+        end
+      end
+    end
+    # --- End Overlay Class ---
   end
 end
+
