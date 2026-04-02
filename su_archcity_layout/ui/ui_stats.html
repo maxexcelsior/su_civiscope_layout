@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f0f2f5;
+      color: #1a1a1a;
+      margin: 0;
+    }
+
+    .tabs {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #ddd;
+      padding: 0 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 12px 0;
+      cursor: pointer;
+      color: #666;
+      font-size: 14px;
+      transition: 0.2s;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab:hover {
+      color: #0056b3;
+    }
+
+    .tab.active {
+      font-weight: bold;
+      color: #0056b3;
+      border-bottom: 2px solid #0056b3;
+    }
+
+    .tab-content {
+      display: none;
+      padding: 12px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      margin-bottom: 12px;
+    }
+
+    .title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #444;
+      margin-bottom: 12px;
+      border-left: 4px solid #0056b3;
+      padding-left: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .id-badge {
+      font-size: 12px;
+      color: #fff;
+      background-color: #0056b3;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: normal;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    input[type="number"],
+    input[type="text"],
+    select {
+      width: 105px;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+
+    .data-label {
+      color: #666;
+    }
+
+    .data-value {
+      font-weight: 600;
+      color: #000;
+    }
+
+    .highlight {
+      color: #0056b3;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      background: #0056b3;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .btn-green {
+      background: #28a745;
+    }
+
+    .view-box {
+      display: none;
+    }
+
+    /* 全局空状态居中样式 */
+    #global-empty {
+      text-align: center;
+      color: #999;
+      padding: 60px 20px;
+      font-style: italic;
+      line-height: 1.6;
+    }
+
+    .multi-table {
+      width: 100%;
+      font-size: 12px;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+
+    .multi-table th {
+      padding: 5px 0;
+      border-bottom: 2px solid #ddd;
+      color: #555;
+      text-align: center;
+    }
+
+    .multi-table td {
+      padding: 6px 0;
+      border-bottom: 1px solid #eee;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="tabs">
+    <div class="tab active" id="btn-tab-bldg" onclick="userSwitchTab('tab-bldg')">🏢 建筑</div>
+    <div class="tab" id="btn-tab-site" onclick="userSwitchTab('tab-site')">🗺️ 用地</div>
+  </div>
+
+  <div id="global-empty" class="view-box" style="display:block;">
+    👆 选择体块/面群组获取信息<br>
+    <span style="font-size:12px;color:#aaa;">(双击进入内部修改可实时监控)</span>
+  </div>
+
+  <div id="tab-bldg" class="tab-content active">
+
+    <div id="bldg-normal" class="view-box card">
+      <p style="font-size:13px; text-align:center;">检测到普通闭合体块</p>
+      <button class="btn" onclick="sketchup.convert_bldg()">✨ 转化为 CIM体块</button>
+    </div>
+
+    <div id="bldg-bim" class="view-box">
+      <div class="card">
+        <div class="title">体块设置<span class="id-badge" id="bldg-id">ID: --</span></div>
+        <div class="row"><span class="data-label">🏷️ 建筑编号</span><input type="text" id="bldg-no" placeholder="如: T1"
+            onchange="updateBldg()"></div>
+        <div class="row"><span class="data-label">📐 标准层高 (m)</span><input type="number" id="bldg-h" step="0.1"
+            onchange="updateBldg()"></div>
+        <div class="row"><span class="data-label">📌 建筑功能</span><select id="bldg-f" onchange="updateBldg()"></select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">实时计算结果</div>
+        <div class="row"><span class="data-label">📏 总体高度:</span> <span class="data-value" id="bldg-th">0</span> m</div>
+        <div class="row"><span class="data-label">🔢 自动层数:</span> <span class="data-value" id="bldg-fc">0</span> 层</div>
+        <div class="row"><span class="data-label">👣 基底面积:</span> <span class="data-value" id="bldg-ba">0</span> m²
+        </div>
+        <div class="row" style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
+          <span style="font-weight:bold;">总建筑面积:</span><span class="highlight"><span id="bldg-area">0.00</span>
+            m²</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="bldg-multi" class="view-box card">
+      <div class="title" style="border-left-color: #28a745;">多体块汇总统计</div>
+      <table class="multi-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;">编号</th>
+            <th>功能</th>
+            <th style="text-align:right;">面积(m²)</th>
+          </tr>
+        </thead>
+        <tbody id="bldg-list"></tbody>
+      </table>
+      <div class="row" style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+        <span style="font-weight:bold; font-size:14px;">总计建筑面积:</span>
+        <span class="highlight" style="color: #28a745;"><span id="bldg-total">0.00</span> m²</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-site" class="tab-content">
+
+    <div id="site-normal" class="view-box card">
+      <p style="font-size:13px; text-align:center;">检测到普通面群组</p>
+      <button class="btn btn-green" onclick="sketchup.convert_site()">🗺️ 转化为 CIM地块</button>
+    </div>
+
+    <div id="site-bim" class="view-box">
+      <div class="card">
+        <div class="title" style="border-left-color: #28a745;">地块设置<span class="id-badge" style="background:#28a745;"
+            id="site-id">ID: --</span></div>
+        <div class="row"><span class="data-label">🏷️ 地块编码</span><input type="text" id="site-no" placeholder="如: A-01"
+            onchange="updateSite()"></div>
+        <div class="row"><span class="data-label">🗂️ 地块类型</span><select id="site-t" onchange="updateSite()"></select>
+        </div>
+        <div class="row"><span class="data-label">📌 用地功能</span><select id="site-f" onchange="updateSite()"></select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title" style="border-left-color: #28a745;">实时计算结果</div>
+        <div class="row" style="margin-top:10px;">
+          <span style="font-weight:bold;">总用地面积:</span><span class="highlight" style="color:#28a745;"><span
+              id="site-area">0.00</span> m²</span>
+        </div>
+      </div>
+      <div class="card" id="site-bldgs-card" style="display:none;">
+        <div class="title" style="border-left-color: #17a2b8;">地块内包含的建筑</div>
+        <table class="multi-table" style="margin-bottom:0;">
+          <thead>
+            <tr>
+              <th style="text-align:left;">编号</th>
+              <th>功能</th>
+              <th style="text-align:right;">建筑面积(m²)</th>
+            </tr>
+          </thead>
+          <tbody id="site-bldgs-list"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="site-multi" class="view-box card">
+      <div class="title" style="border-left-color: #28a745;">多地块汇总统计</div>
+      <table class="multi-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;">编码</th>
+            <th>类型</th>
+            <th style="text-align:right;">面积(m²)</th>
+          </tr>
+        </thead>
+        <tbody id="site-list"></tbody>
+      </table>
+      <div class="row" style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+        <span style="font-weight:bold; font-size:14px;">总计用地面积:</span>
+        <span class="highlight" style="color: #28a745;"><span id="site-total">0.00</span> m²</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentActiveTab = 'tab-bldg';
+
+    window.onload = function () {
+      let topMargin = Math.max(0, (window.screen.availHeight - 550) / 2);
+      window.moveTo(80, topMargin);
+      sketchup.ready();
+    };
+
+    function userSwitchTab(tabId) {
+      currentActiveTab = tabId;
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId === 'tab-bldg' ? 'btn-tab-bldg' : 'btn-tab-site').classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      sketchup.on_tab_changed(tabId);
+    }
+
+    function autoSwitchTab(tabId) {
+      if (currentActiveTab !== tabId) {
+        currentActiveTab = tabId;
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId === 'tab-bldg' ? 'btn-tab-bldg' : 'btn-tab-site').classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+      }
+    }
+
+    function updateBldg() { sketchup.apply_bldg(document.getElementById('bldg-h').value, document.getElementById('bldg-f').value, document.getElementById('bldg-no').value); }
+    function updateSite() { sketchup.apply_site(document.getElementById('site-t').value, document.getElementById('site-f').value, document.getElementById('site-no').value); }
+
+    function buildOptions(arr, currentVal) {
+      let str = "";
+      arr.forEach(val => { str += `<option value="${val}" ${(val === currentVal) ? "selected" : ""}>${val}</option>`; });
+      if (currentVal && !arr.includes(currentVal)) str += `<option value="${currentVal}" selected>${currentVal} (未知)</option>`;
+      return str;
+    }
+
+    function showEmptyState() {
+      document.querySelectorAll('.view-box').forEach(el => el.style.display = 'none');
+      document.getElementById('global-empty').style.display = 'block';
+    }
+
+    function refreshUI(type, mode, types, funcs, data) {
+      document.querySelectorAll('.view-box').forEach(el => el.style.display = 'none');
+
+      if (mode === 'empty') {
+        document.getElementById('global-empty').style.display = 'block';
+      }
+      else if (mode === 'normal') {
+        autoSwitchTab(`tab-${type}`);
+        document.getElementById(`${type}-normal`).style.display = 'block';
+      }
+      else if (mode === 'bim') {
+        autoSwitchTab(`tab-${type}`);
+        document.getElementById(`${type}-bim`).style.display = 'block';
+        document.getElementById(`${type}-id`).innerText = "ID: " + data.id;
+        document.getElementById(`${type}-no`).value = data.no;
+        document.getElementById(`${type}-f`).innerHTML = buildOptions(funcs, data.f);
+        document.getElementById(`${type}-area`).innerText = data.area;
+
+        if (type === 'bldg') {
+          document.getElementById('bldg-h').value = data.h;
+          document.getElementById('bldg-th').innerText = data.th;
+          document.getElementById('bldg-fc').innerText = data.fc;
+          document.getElementById('bldg-ba').innerText = data.ba;
+        } else {
+          document.getElementById('site-t').innerHTML = buildOptions(types, data.t);
+          if (data.bldgs && data.bldgs.length > 0) {
+            let bHtml = "";
+            let tArea = 0;
+            data.bldgs.forEach(b => {
+              let dNo = b.no ? b.no : "<span style='color:#aaa'>未编号</span>";
+              bHtml += `<tr><td style="text-align:left; color:#17a2b8;">${dNo}</td><td>${b.f}</td><td style="text-align:right; font-weight:bold;">${b.area}</td></tr>`;
+              tArea += b.area;
+            });
+            bHtml += `<tr><td colspan="2" style="text-align:right; color:#888;">汇总面积:</td><td style="text-align:right; color:#17a2b8; font-weight:bold;">${tArea.toFixed(2)}</td></tr>`;
+            document.getElementById('site-bldgs-list').innerHTML = bHtml;
+            document.getElementById('site-bldgs-card').style.display = 'block';
+          } else {
+            document.getElementById('site-bldgs-card').style.display = 'none';
+          }
+        }
+      }
+      else if (mode === 'multi') {
+        autoSwitchTab(`tab-${type}`);
+        document.getElementById(`${type}-multi`).style.display = 'block';
+        let listHtml = "";
+        data.list.forEach(item => {
+          let displayNo = item.no ? item.no : "<span style='color:#aaa'>未编号</span>";
+          let label = type === 'bldg' ? item.f : item.t;
+          listHtml += `<tr><td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td><td>${label}</td><td style="text-align:right; font-weight:bold;">${item.area}</td></tr>`;
+        });
+        document.getElementById(`${type}-list`).innerHTML = listHtml;
+        document.getElementById(`${type}-total`).innerText = data.total;
+      }
+    }
+  </script>
+</body>
+
+</html>

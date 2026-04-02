@@ -27,15 +27,20 @@
   <div class="content">
     <div id="tab-building" class="tab-content active">
       <h3>建筑功能选项管理</h3>
-      <div id="func-list"></div>
+      <div id="bldg-func-list"></div>
       <div class="add-box">
-        <input type="text" id="new-func" placeholder="输入自定义功能...">
-        <button onclick="addFunc()">添加</button>
+        <input type="text" id="new-bldg-func" placeholder="输入自定义功能...">
+        <button onclick="addFunc('bldg')">添加</button>
       </div>
     </div>
+    
     <div id="tab-site" class="tab-content">
-      <h3>用地设置</h3>
-      <p style="color:#888; font-size:13px;">功能开发中...</p>
+      <h3 style="border-bottom-color: #28a745;">用地功能选项管理</h3>
+      <div id="site-func-list"></div>
+      <div class="add-box">
+        <input type="text" id="new-site-func" placeholder="输入自定义用地..." style="border-color:#28a745;">
+        <button onclick="addFunc('site')" style="background:#28a745;">添加</button>
+      </div>
     </div>
   </div>
 
@@ -46,17 +51,27 @@
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
     }
-    function renderFuncs(defaults, customs) {
-      let html = '';
-      defaults.forEach(f => { html += `<div class="list-item default"><span>${f}</span> <span>(默认不可改)</span></div>`; });
-      customs.forEach(f => { html += `<div class="list-item"><span>${f}</span> <button class="btn-del" onclick="delFunc('${f}')">✕ 删除</button></div>`; });
-      document.getElementById('func-list').innerHTML = html;
+    
+    function renderLists(bDefs, bCust, sDefs, sCust) {
+      let bHtml = '';
+      bDefs.forEach(f => { bHtml += `<div class="list-item default"><span>${f}</span> <span>(默认)</span></div>`; });
+      bCust.forEach(f => { bHtml += `<div class="list-item"><span>${f}</span> <button class="btn-del" onclick="delFunc('bldg', '${f}')">✕ 删除</button></div>`; });
+      document.getElementById('bldg-func-list').innerHTML = bHtml;
+
+      let sHtml = '';
+      sDefs.forEach(f => { sHtml += `<div class="list-item default"><span>${f}</span> <span>(默认)</span></div>`; });
+      sCust.forEach(f => { sHtml += `<div class="list-item"><span>${f}</span> <button class="btn-del" onclick="delFunc('site', '${f}')">✕ 删除</button></div>`; });
+      document.getElementById('site-func-list').innerHTML = sHtml;
     }
-    function addFunc() {
-      let val = document.getElementById('new-func').value.trim();
-      if(val) { sketchup.add_custom_func(val); document.getElementById('new-func').value = ''; }
+
+    function addFunc(type) {
+      let val = document.getElementById(`new-${type}-func`).value.trim();
+      if(val) { 
+        sketchup.add_custom_func(type, val); 
+        document.getElementById(`new-${type}-func`).value = ''; 
+      }
     }
-    function delFunc(f) { sketchup.del_custom_func(f); }
+    function delFunc(type, f) { sketchup.del_custom_func(type, f); }
     window.onload = function() { sketchup.ready(); };
   </script>
 </body>
