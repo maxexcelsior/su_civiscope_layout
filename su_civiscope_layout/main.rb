@@ -9,12 +9,17 @@ module CiviscopeLayout
     # 0. 全局常量与配置中心
     # ==========================================
     PLUGIN_NAME = "Civiscope_Layout" unless defined?(PLUGIN_NAME)
-    VERSION = "beta 0.1.1" unless defined?(VERSION)
+    VERSION = "beta 0.1.2"
     AUTHOR = "MaxExcelsior" unless defined?(AUTHOR)
     
     DEFAULT_BLDG_FUNCS = ["办公", "商业", "居住", "公服设施", "市政设施", "交通设施"] unless defined?(DEFAULT_BLDG_FUNCS)
     DEFAULT_SITE_FUNCS = ["居住用地", "商业用地", "中小学用地", "绿地与广场用地", "道路与交通用地", "公园绿地", "防护绿地", "广场用地", "水域"] unless defined?(DEFAULT_SITE_FUNCS)
     SITE_TYPES = ["建设用地", "绿地与广场用地", "水域"] unless defined?(SITE_TYPES)
+    
+    class << self
+      attr_accessor :skip_recalc
+      attr_accessor :timer_id
+    end
 
     COLOR_MAP = {
       # 建筑颜色
@@ -27,13 +32,31 @@ module CiviscopeLayout
       "防护绿地" => [0, 184, 0], 
       "广场用地" => [217, 217, 217], 
       "水域"     => [129, 255, 255]  
-    }
+    } unless defined?(COLOR_MAP)
 
     # ==========================================
-    # 1. 加载子功能模块(顺序很重要)
+    # 1. 加载子功能模块 (顺序很重要)
     # ==========================================
-    require File.join(__dir__, 'settings.rb')
-    require File.join(__dir__, 'stats.rb')
+    require_relative 'settings'
+    
+    # 工具类
+    require_relative 'utils/attr_helper'
+    require_relative 'utils/geom_helper'
+    
+    # 逻辑类
+    require_relative 'logic/bldg_manager'
+    require_relative 'logic/site_manager'
+    require_relative 'logic/stats_engine'
+    
+    # 观察者
+    require_relative 'observers/model_watcher'
+    require_relative 'observers/selection_watcher'
+    require_relative 'observers/entity_watcher'
+    
+    # UI 与渲染
+    require_relative 'ui/picker_tool'
+    require_relative 'render/height_overlay'
+    require_relative 'ui/stats_dialog'
 
     # ==========================================
     # 辅助功能：热重载 (开发调试用)
@@ -41,9 +64,22 @@ module CiviscopeLayout
     def self.reload
       load __FILE__
       load File.join(__dir__, 'settings.rb')
-      load File.join(__dir__, 'stats.rb')
-      puts "=> Civiscope Layout 代码重载完成!"
-      UI.messagebox("插件已重新加载！")
+      
+      # 加载子模块
+      load File.join(__dir__, 'utils', 'attr_helper.rb')
+      load File.join(__dir__, 'utils', 'geom_helper.rb')
+      load File.join(__dir__, 'logic', 'bldg_manager.rb')
+      load File.join(__dir__, 'logic', 'site_manager.rb')
+      load File.join(__dir__, 'logic', 'stats_engine.rb')
+      load File.join(__dir__, 'observers', 'model_watcher.rb')
+      load File.join(__dir__, 'observers', 'selection_watcher.rb')
+      load File.join(__dir__, 'observers', 'entity_watcher.rb')
+      load File.join(__dir__, 'ui', 'picker_tool.rb')
+      load File.join(__dir__, 'render', 'height_overlay.rb')
+      load File.join(__dir__, 'ui', 'stats_dialog.rb')
+      
+      puts "=> Civiscope Layout 代码模块化重载完成!"
+      UI.messagebox("插件及所有模块已重新加载！")
       return true
     end
 

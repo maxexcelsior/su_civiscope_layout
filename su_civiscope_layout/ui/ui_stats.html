@@ -267,24 +267,33 @@
   <div
     style="padding: 10px; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 43px; z-index: 90;">
     <div id="toolbar-site" style="display:none; flex-direction: column; gap: 8px;">
+      <!-- Row 1: Pick Site and Internal Greenery -->
       <div style="display:flex; gap:8px;">
         <button id="btn-pick-site" class="toolbar-btn" style="flex:1;" onclick="sketchup.start_picker('site')">🖌️
           属性刷</button>
+        <button id="btn-green-tool" class="toolbar-btn" style="flex:1;" onclick="sketchup.activate_greenery_tool()">🌿
+          内部绿地</button>
+      </div>
+      <!-- Row 2: Face to Site and Height Limit Control -->
+      <div style="display:flex; gap:8px; align-items: stretch;">
         <button id="btn-face-to-site" class="toolbar-btn" style="flex:1;" onclick="sketchup.faces_to_sites()">🟩
           面转地块</button>
-      </div>
-      <div id="hl-control-group"
-        style="display:flex; flex-direction: column; border: 1px solid #eee; border-radius: 4px; background: #fafafa; overflow: hidden;">
-        <div
-          style="font-size: 10px; font-weight: bold; color: #666; text-align: center; padding: 2px 0; background: #f0f0f0; border-bottom: 1px solid #eee;">
-          地块限高检测</div>
-        <div style="display:flex; gap:0;">
-          <button id="btn-hl-all-on" class="toolbar-btn"
-            style="flex:1; border:none; border-right: 1px solid #eee; border-radius: 0; padding: 5px 2px; font-size: 11px; background: white;"
-            onclick="sketchup.set_all_height_checks(true)">📏 全部开启</button>
-          <button id="btn-hl-all-off" class="toolbar-btn"
-            style="flex:1; border:none; border-radius: 0; padding: 5px 2px; font-size: 11px; background: white;"
-            onclick="sketchup.set_all_height_checks(false)">✖️ 全部关闭</button>
+        <div id="hl-control-group"
+          style="flex:1; display:flex; flex-direction: column; border: 1px solid #eee; border-radius: 4px; background: #fafafa; overflow: hidden;">
+          <div
+            style="font-size: 10px; font-weight: bold; color: #666; text-align: center; padding: 2px 0; background: #f0f0f0; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: center; gap: 4px;">
+            地块限高检测
+            <span style="display:inline-block; width:12px; height:12px; line-height:12px; border-radius:50%; border:1px solid #999; color:#999; cursor:help; font-size:9px;" 
+                  title="需打开SU overlay（覆盖）功能，窗口→默认面板→覆盖（overlay）">?</span>
+          </div>
+          <div style="display:flex; gap:0; flex:1;">
+            <button id="btn-hl-all-on" class="toolbar-btn"
+              style="flex:1; border:none; border-right: 1px solid #eee; border-radius: 0; padding: 2px; font-size: 10px; background: white;"
+              onclick="sketchup.set_all_height_checks(true)">📏 开启</button>
+            <button id="btn-hl-all-off" class="toolbar-btn"
+              style="flex:1; border:none; border-radius: 0; padding: 2px; font-size: 10px; background: white;"
+              onclick="sketchup.set_all_height_checks(false)">✖️ 关闭</button>
+          </div>
         </div>
       </div>
     </div>
@@ -397,6 +406,10 @@
             <span class="readonly-label">建筑密度</span>
             <span class="readonly-value" id="bp-density">0.0%</span>
           </div>
+          <div class="readonly-item">
+            <span class="readonly-label">绿地率</span>
+            <span class="readonly-value"><span id="bp-green-rate">0.0</span>% (<span id="bp-green-m2">0.00</span> m²)</span>
+          </div>
         </div>
         <p
           style="font-size:10px; color:#aaa; margin-top:12px; text-align:center; border-top:1px dashed #eee; padding-top:8px;">
@@ -437,6 +450,10 @@
           <span style="font-weight:bold;">建筑密度：</span><span class="highlight" style="color: #28a745;"><span
               id="site-density">0.0</span> %</span>
         </div>
+        <div class="row" style="margin-top:10px;">
+          <span style="font-weight:bold;">绿地率：</span><span class="highlight" style="color: #28a745;"><span
+              id="site-green-rate">0.0</span> % (<span id="site-green-m2">0.00</span> m²)</span>
+        </div>
       </div>
       <div class="card" id="site-bldgs-card" style="display:none;">
         <div class="title" style="border-left-color: #ffc107;">地块内包含的建筑实体</div>
@@ -471,6 +488,7 @@
             <th style="text-align:right;">计容</th>
             <th style="text-align:right;">容积率</th>
             <th style="text-align:right;">密度</th>
+            <th style="text-align:right;">绿地率</th>
           </tr>
         </thead>
         <tbody id="site-list"></tbody>
@@ -627,24 +645,29 @@
                 tBaseArea += parseFloat(b.base_area || 0);
               });
               document.getElementById('site-bldgs-list').innerHTML = bHtml;
-              document.getElementById('site-bldgs-total').innerText = tArea.toFixed(2);
+              document.getElementById('site-bldgs-total').innerText = (data.gfa || 0).toFixed(2);
               document.getElementById('site-bldgs-card').style.display = 'block';
 
-              let site_area = parseFloat(data.area) || 0.001;
-              let far = tArea / site_area;
-              let density = (tBaseArea / site_area) * 100;
-
-              if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = far.toFixed(2); }
-              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = density.toFixed(1); }
+              if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = (data.far || 0).toFixed(2); }
+              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = (data.density || 0).toFixed(1); }
+              if (document.getElementById('site-green-rate')) { document.getElementById('site-green-rate').innerText = (data.green_rate || 0).toFixed(1); }
+              if (document.getElementById('site-green-m2')) { document.getElementById('site-green-m2').innerText = (data.green_m2 || 0).toFixed(2); }
             } else {
               if (document.getElementById('site-bldgs-card')) document.getElementById('site-bldgs-card').style.display = 'none';
-              if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = "0.00"; }
-              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = "0.0"; }
+              if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = (data.far || 0).toFixed(2); }
+              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = (data.density || 0).toFixed(1); }
+              if (document.getElementById('site-green-rate')) { document.getElementById('site-green-rate').innerText = (data.green_rate || 0).toFixed(1); }
+              if (document.getElementById('site-green-m2')) { document.getElementById('site-green-m2').innerText = (data.green_m2 || 0).toFixed(2); }
             }
           }
         } else if (mode === 'bp_group') {
-          autoSwitchTab(`tab-site`);
-          document.getElementById('site-bp-group').style.display = 'block';
+          autoSwitchTab(`tab-${type}`);
+          if (type === 'site') {
+            document.getElementById('site-bp-group').style.display = 'block';
+          } else {
+            // For building inside BP group, we can show the normal BIM card or its own group view
+            document.getElementById('bldg-bim').style.display = 'block';
+          }
 
           document.getElementById('bp-no').innerText = data.no || "-";
           document.getElementById('bp-t').innerText = data.t || "-";
@@ -655,6 +678,8 @@
           document.getElementById('bp-gfa').innerText = (data.gfa || 0).toFixed(2);
           document.getElementById('bp-far').innerText = (data.far || 0).toFixed(2);
           document.getElementById('bp-density').innerText = (data.density || 0).toFixed(1) + "%";
+          document.getElementById('bp-green-rate').innerText = (data.green_rate || 0).toFixed(1);
+          document.getElementById('bp-green-m2').innerText = (data.green_m2 || 0).toFixed(2);
         }
 
 
@@ -677,6 +702,7 @@
                   <td style="text-align:right; color:#28a745; font-weight:bold;">${item.gfa}</td>
                   <td style="text-align:right;">${item.far}</td>
                   <td style="text-align:right;">${item.density}%</td>
+                  <td style="text-align:right; color:#388e3c;">${item.green_rate}%</td>
                 </tr>`;
               }
             });
