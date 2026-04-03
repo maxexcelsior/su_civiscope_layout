@@ -192,11 +192,21 @@
       border-color: #218838;
       color: #218838;
     }
+    .banner { padding: 8px 12px; font-size: 12px; text-align: center; }
+    .banner.warning { background: #fff3cd; color: #856404; border-bottom: 1px solid #ffeeba; }
+    .banner.info { background: #d1ecf1; color: #0c5460; border-bottom: 1px solid #bee5eb; }
+
+    /* Readonly Grid for BP Group */
+    .readonly-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; margin-top: 10px; }
+    .readonly-item { display: flex; flex-direction: column; background: #fbfbfb; padding: 8px; border-radius: 4px; border: 1px solid #eee; }
+    .readonly-label { font-size: 10px; color: #888; margin-bottom: 2px; }
+    .readonly-value { font-size: 13px; font-weight: bold; color: #333; }
+    .bp-tag { font-size: 10px; background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 10px; font-weight: normal; margin-left: 6px;}
   </style>
 </head>
 
 <body>
-
+  <div id="banner" class="banner" style="display:none;"></div>
   <div class="tabs">
     <div class="tab active" id="btn-tab-bldg" onclick="userSwitchTab('tab-bldg')">🏢 建筑</div>
     <div class="tab" id="btn-tab-site" onclick="userSwitchTab('tab-site')">🗺️ 用地</div>
@@ -272,6 +282,48 @@
       <button class="btn btn-green" onclick="sketchup.convert_site()">✨ 转换为CIM地块</button>
     </div>
 
+    <!-- BP Group Readonly View -->
+    <div id="site-bp-group" class="view-box">
+      <div class="card">
+        <div class="title" style="border-left-color: #2e7d32;">BP组概览 <span class="bp-tag">只读预览</span></div>
+        <div class="readonly-grid">
+          <div class="readonly-item">
+            <span class="readonly-label">地块编号</span>
+            <span class="readonly-value" id="bp-no">-</span>
+          </div>
+          <div class="readonly-item">
+            <span class="readonly-label">用地大类</span>
+            <span class="readonly-value" id="bp-t">-</span>
+          </div>
+          <div class="readonly-item">
+            <span class="readonly-label">用地性质</span>
+            <span class="readonly-value" id="bp-f">-</span>
+          </div>
+          <div class="readonly-item">
+            <span class="readonly-label">用地面积 (m²)</span>
+            <span class="readonly-value" id="bp-area">0.00</span>
+          </div>
+          <div class="readonly-item">
+            <span class="readonly-label">总计容建面 (m²)</span>
+            <span class="readonly-value" id="bp-gfa" style="color:#2e7d32;">0.00</span>
+          </div>
+          <div class="readonly-item">
+            <span class="readonly-label">容积率 (FAR)</span>
+            <span class="readonly-value" id="bp-far">0.00</span>
+          </div>
+          <div class="readonly-item">
+            <span class="readonly-label">地块限高 (m)</span>
+            <span class="readonly-value" id="bp-hl">0.0</span>
+          </div>
+          <div class="readonly-item">
+            <span class="readonly-label">建筑密度</span>
+            <span class="readonly-value" id="bp-density">0.0%</span>
+          </div>
+        </div>
+        <p style="font-size:10px; color:#aaa; margin-top:12px; text-align:center; border-top:1px dashed #eee; padding-top:8px;">提示：双击进入建筑组内部可修改地块属性</p>
+      </div>
+    </div>
+
     <div id="site-bim" class="view-box">
       <div class="card">
         <div class="title" style="border-left-color: #28a745;">地块信息 <span class="id-badge" style="background:#28a745;"
@@ -325,13 +377,16 @@
     </div>
 
     <div id="site-multi" class="view-box card">
-      <div class="title" style="border-left-color: #28a745;">多选地块数据汇总</div>
-      <table class="multi-table">
+      <div class="title" style="border-left-color: #28a745;">选中地块汇总对比</div>
+      <table class="multi-table" style="font-size: 10px;">
         <thead>
           <tr>
             <th style="text-align:left;">编号</th>
-            <th>大类</th>
-            <th style="text-align:right;">面积(m²)</th>
+            <th>性质</th>
+            <th style="text-align:right;">面积</th>
+            <th style="text-align:right;">计容</th>
+            <th style="text-align:right;">容积率</th>
+            <th style="text-align:right;">密度</th>
           </tr>
         </thead>
         <tbody id="site-list"></tbody>
@@ -373,14 +428,22 @@
     }
 
     function autoSwitchTab(tabId) {
-      if (currentActiveTab !== tabId) {
-        currentActiveTab = tabId;
-        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-        document.getElementById(tabId === 'tab-bldg' ? 'btn-tab-bldg' : 'btn-tab-site').classList.add('active');
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        updateToolbarDisplay(tabId);
+      currentActiveTab = tabId;
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      let btnId = tabId === 'tab-bldg' ? 'btn-tab-bldg' : 'btn-tab-site';
+      let btn = document.getElementById(btnId);
+      if (btn) btn.classList.add('active');
+      
+      document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none'; // Force hide all first
+      });
+      let content = document.getElementById(tabId);
+      if (content) {
+        content.classList.add('active');
+        content.style.display = 'block'; // Explicitly force current tab visible
       }
+      updateToolbarDisplay(tabId);
     }
 
     function updateBldg() { sketchup.apply_bldg(document.getElementById('bldg-h').value, document.getElementById('bldg-f').value, document.getElementById('bldg-no').value, document.getElementById('bldg-type').value, document.getElementById('bldg-th').value); }
@@ -402,6 +465,15 @@
       let idStr = document.getElementById('site-id').innerText.replace("ID: ", "").trim();
       sketchup.toggle_height_check(idStr);
     }
+    function showBanner(type, msg) {
+      let banner = document.getElementById('banner');
+      banner.className = 'banner ' + (type || 'info');
+      banner.innerText = msg;
+      banner.style.display = 'block';
+    }
+    function hideBanner() {
+      document.getElementById('banner').style.display = 'none';
+    }
     function buildOptions(arr, currentVal) {
       let str = "";
       arr.forEach(val => { str += `<option value="${val}" ${val === currentVal ? "selected" : ""}>${val}</option>`; });
@@ -415,75 +487,123 @@
     }
 
     function refreshUI(type, mode, types, funcs, data) {
-      document.querySelectorAll('.view-box').forEach(el => el.style.display = 'none');
+      try {
+        document.querySelectorAll('.view-box').forEach(el => el.style.display = 'none');
 
-      if (mode === 'empty') {
-        document.getElementById('global-empty').style.display = 'block';
-      }
-      else if (mode === 'normal') {
-        autoSwitchTab(`tab-${type}`);
-        document.getElementById(`${type}-normal`).style.display = 'block';
-      }
-      else if (mode === 'bim') {
-        autoSwitchTab(`tab-${type}`);
-        document.getElementById(`${type}-bim`).style.display = 'block';
-        document.getElementById(`${type}-id`).innerText = "ID: " + data.id;
-        document.getElementById(`${type}-no`).value = data.no;
-        document.getElementById(`${type}-f`).innerHTML = buildOptions(funcs, data.f);
-        document.getElementById(`${type}-area`).innerText = data.area;
+        if (mode === 'empty') {
+          document.getElementById('global-empty').style.display = 'block';
+        }
+        else if (mode === 'normal') {
+          autoSwitchTab(`tab-${type}`);
+          document.getElementById(`${type}-normal`).style.display = 'block';
+        }
+        else if (mode === 'bim') {
+          autoSwitchTab(`tab-${type}`);
+          document.getElementById(`${type}-bim`).style.display = 'block';
+          if (document.getElementById(`${type}-id`)) document.getElementById(`${type}-id`).innerText = "ID: " + (data.id || "-");
+          if (document.getElementById(`${type}-no`)) document.getElementById(`${type}-no`).value = data.no || "";
+          let fEl = document.getElementById(`${type}-f`);
+          if (fEl) fEl.innerHTML = buildOptions(funcs, data.f);
+          if (document.getElementById(`${type}-area`)) document.getElementById(`${type}-area`).innerText = data.area || "0";
 
-        if (type === 'bldg') {
-          document.getElementById('bldg-h').value = data.h || "3.0";
-          document.getElementById('bldg-type').value = data.type || "塔楼";
-          document.getElementById('bldg-f').innerHTML = buildOptions(funcs, data.f || funcs[0]);
-
-          document.getElementById('bldg-th').value = data.th || "0";
-          document.getElementById('bldg-fc').innerText = data.fc || "0";
-          document.getElementById('bldg-ba').innerText = data.ba || "0";
-        } else {
-          document.getElementById('site-t').innerHTML = buildOptions(types, data.t);
-          document.getElementById('site-hl').value = data.hl || "0";
-          if (data.bldgs && data.bldgs.length > 0) {
-            let bHtml = "";
-            let tArea = 0;
-            let tBaseArea = 0;
-            data.bldgs.forEach(b => {
-              let dNo = b.no ? b.no : "<span style='color:#aaa;'>无编号</span>";
-              bHtml += `<tr><td style="text-align:left; color:#17a2b8;">${dNo}</td><td>${b.f}</td><td style="text-align:right; font-weight:bold;">${b.area}</td></tr>`;
-              tArea += b.area;
-              tBaseArea += parseFloat(b.base_area || 0);
-            });
-            document.getElementById('site-bldgs-list').innerHTML = bHtml;
-            document.getElementById('site-bldgs-total').innerText = tArea.toFixed(2);
-            document.getElementById('site-bldgs-card').style.display = 'block';
-            
-            let site_area = parseFloat(data.area) || 0.001;
-            let far = tArea / site_area;
-            let density = (tBaseArea / site_area) * 100;
-            
-            if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = far.toFixed(2); }
-            if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = density.toFixed(1); }
+          if (type === 'bldg') {
+            document.getElementById('bldg-h').value = data.h || "3.0";
+            document.getElementById('bldg-type').value = data.type || "塔楼";
+            document.getElementById('bldg-f').innerHTML = buildOptions(funcs, data.f || funcs[0]);
+            document.getElementById('bldg-th').value = data.th || "0";
+            document.getElementById('bldg-fc').innerText = data.fc || "0";
+            document.getElementById('bldg-ba').innerText = data.ba || "0";
           } else {
-            document.getElementById('site-bldgs-card').style.display = 'none';
-            if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = "0.00"; }
-            if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = "0.0"; }
+            let tEl = document.getElementById('site-t');
+            if (tEl) tEl.innerHTML = buildOptions(types, data.t);
+            if (document.getElementById('site-hl')) document.getElementById('site-hl').value = data.hl || "0";
+            
+            if (data.bldgs && data.bldgs.length > 0) {
+              let bHtml = "";
+              let tArea = 0;
+              let tBaseArea = 0;
+              data.bldgs.forEach(b => {
+                let dNo = b.no ? b.no : "<span style='color:#aaa;'>无编号</span>";
+                bHtml += `<tr><td style="text-align:left; color:#17a2b8;">${dNo}</td><td>${b.f}</td><td style="text-align:right; font-weight:bold;">${b.area}</td></tr>`;
+                tArea += parseFloat(b.area || 0);
+                tBaseArea += parseFloat(b.base_area || 0);
+              });
+              document.getElementById('site-bldgs-list').innerHTML = bHtml;
+              document.getElementById('site-bldgs-total').innerText = tArea.toFixed(2);
+              document.getElementById('site-bldgs-card').style.display = 'block';
+              
+              let site_area = parseFloat(data.area) || 0.001;
+              let far = tArea / site_area;
+              let density = (tBaseArea / site_area) * 100;
+              
+              if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = far.toFixed(2); }
+              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = density.toFixed(1); }
+            } else {
+              if (document.getElementById('site-bldgs-card')) document.getElementById('site-bldgs-card').style.display = 'none';
+              if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = "0.00"; }
+              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = "0.0"; }
+            }
           }
         }
-      }
-      else if (mode === 'multi') {
-        autoSwitchTab(`tab-${type}`);
-        document.getElementById(`${type}-multi`).style.display = 'block';
-        let listHtml = "";
-        data.list.forEach(item => {
-          let displayNo = item.no ? item.no : "<span style='color:#aaa;'>无编号</span>";
-          let label = type === 'bldg' ? item.f : item.t;
-          listHtml += `<tr><td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td><td>${label}</td><td style="text-align:right; font-weight:bold;">${item.area}</td></tr>`;
-        });
-        document.getElementById(`${type}-list`).innerHTML = listHtml;
-        document.getElementById(`${type}-total`).innerText = parseFloat(data.totalArea || 0).toFixed(2);
+        else if (mode === 'bp_group') {
+          autoSwitchTab(`tab-site`);
+          document.getElementById('site-bp-group').style.display = 'block';
+          
+          document.getElementById('bp-no').innerText = data.no || "-";
+          document.getElementById('bp-t').innerText = data.t || "-";
+          document.getElementById('bp-f').innerText = data.f || "-";
+          document.getElementById('bp-area').innerText = parseFloat(data.area || 0).toFixed(2);
+          document.getElementById('bp-hl').innerText = parseFloat(data.hl || 0).toFixed(1);
+
+          // Use pre-calculated values from Ruby for better accuracy and stability
+          document.getElementById('bp-gfa').innerText = (data.gfa || 0).toFixed(2);
+          document.getElementById('bp-far').innerText = (data.far || 0).toFixed(2);
+          document.getElementById('bp-density').innerText = (data.density || 0).toFixed(1) + "%";
+        }
+        else if (mode === 'multi') {
+          autoSwitchTab(`tab-${type}`);
+          document.getElementById(`${type}-multi`).style.display = 'block';
+          let listHtml = "";
+          if (data.list) {
+            data.list.forEach(item => {
+              let displayNo = item.no ? item.no : "<span style='color:#aaa;'>无</span>";
+              let label = type === 'bldg' ? item.f : item.t;
+              if (type === 'bldg') {
+                listHtml += `<tr><td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td><td>${label}</td><td style="text-align:right; font-weight:bold;">${item.area}</td></tr>`;
+              } else {
+                listHtml += `<tr>
+                  <td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td>
+                  <td style="font-size:10px;">${label}</td>
+                  <td style="text-align:right;">${item.area}</td>
+                  <td style="text-align:right; color:#28a745; font-weight:bold;">${item.gfa}</td>
+                  <td style="text-align:right;">${item.far}</td>
+                  <td style="text-align:right;">${item.density}%</td>
+                </tr>`;
+              }
+            });
+          }
+          let lEl = document.getElementById(`${type}-list`);
+          if (lEl) lEl.innerHTML = listHtml;
+          let tAreaEl = document.getElementById(`${type}-total`);
+          if (tAreaEl) tAreaEl.innerText = parseFloat(data.totalArea || 0).toFixed(2);
+        }
+      } catch (e) {
+        console.error("UI Refresh Error:", e);
       }
     }
+    function showEmptyState() {
+      document.getElementById('global-empty').style.display = 'block';
+      document.getElementById('tab-bldg').style.display = 'none';
+      document.getElementById('tab-site').style.display = 'none';
+    }
+
+    let resizeTimer;
+    window.onresize = function() {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        sketchup.on_resized(window.outerWidth, window.outerHeight);
+      }, 500);
+    };
   </script>
 </body>
-
 </html>

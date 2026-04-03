@@ -38,6 +38,17 @@ module CiviscopeLayout
       Sketchup.write_default(PLUGIN_NAME, "custom_colors", hash.to_json)
     end
 
+    def self.get_stats_size
+      w = Sketchup.read_default(PLUGIN_NAME, "stats_width", 320).to_i
+      h = Sketchup.read_default(PLUGIN_NAME, "stats_height", 550).to_i
+      [w, h]
+    end
+
+    def self.save_stats_size(w, h)
+      Sketchup.write_default(PLUGIN_NAME, "stats_width", w.to_i)
+      Sketchup.write_default(PLUGIN_NAME, "stats_height", h.to_i)
+    end
+
     # ==========================================
     # UI 弹窗与交互逻辑
     # ==========================================
@@ -92,6 +103,14 @@ module CiviscopeLayout
         self.refresh_stats_ui(Sketchup.active_model.selection)
       end
 
+      @dialog_settings.add_action_callback("update_stats_size") do |_, w, h|
+        self.save_stats_size(w, h)
+        # Try to resize if dialog exists
+        if @dialog_stats && @dialog_stats.visible?
+          @dialog_stats.set_size(w.to_i, h.to_i)
+        end
+      end
+
       @dialog_settings.set_on_closed { @dialog_settings = nil }
       @dialog_settings.show
     end
@@ -104,7 +123,8 @@ module CiviscopeLayout
         site: { defs: DEFAULT_SITE_FUNCS, cust: self.get_custom_funcs('site') },
         types: SITE_TYPES,
         colors: self.get_custom_colors,
-        fallback_colors: COLOR_MAP
+        fallback_colors: COLOR_MAP,
+        stats_size: self.get_stats_size
       }
       
       @dialog_settings.execute_script("renderLists(#{data.to_json})")

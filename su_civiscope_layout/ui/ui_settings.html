@@ -56,6 +56,7 @@
   <div class="sidebar">
     <div class="nav-item active" onclick="switchTab('tab-building')">建筑配置</div>
     <div class="nav-item" onclick="switchTab('tab-site')">用地配置</div>
+    <div class="nav-item" onclick="switchTab('tab-gui')">界面设置</div>
   </div>
   <div class="content">
     <div id="tab-building" class="tab-content active">
@@ -76,6 +77,19 @@
       <div class="add-box">
         <input type="text" id="new-site-func" placeholder="输入追加性质名称..." style="border-color:#28a745;">
         <button onclick="addFunc('site')" style="background:#28a745;">添加</button>
+      </div>
+    </div>
+
+    <div id="tab-gui" class="tab-content">
+      <h3 style="border-bottom-color: #6c757d;">统计中心窗口尺寸 (像素)</h3>
+      <div class="card-simple" style="padding:15px; background:#f9f9f9; border-radius:8px;">
+        <div class="row-flex" style="display:flex; align-items:center; gap:15px; margin-bottom:15px;">
+          <span>宽度:</span>
+          <input type="number" id="gui-stats-w" style="width:70px; padding:5px; border:1px solid #ccc; border-radius:4px;" onchange="saveGui()">
+          <span>高度:</span>
+          <input type="number" id="gui-stats-h" style="width:70px; padding:5px; border:1px solid #ccc; border-radius:4px;" onchange="saveGui()">
+        </div>
+        <p style="font-size:11px; color:#888;">* 您也可以直接在统计中心窗口边缘进行拉伸，尺寸会自动同步到此处。</p>
       </div>
     </div>
   </div>
@@ -182,6 +196,12 @@
       let sDefs = payload.site.defs;
       let sCust = payload.site.cust;
       let types = payload.types;
+      
+      // 尺寸
+      if (payload.stats_size) {
+        document.getElementById('gui-stats-w').value = payload.stats_size[0];
+        document.getElementById('gui-stats-h').value = payload.stats_size[1];
+      }
 
       // 建筑部分
       let bHtml = '';
@@ -379,6 +399,11 @@
       if(box) box.style.background = currentColorHex;
       
       cpClose();
+    }
+    function saveGui() {
+      let w = document.getElementById('gui-stats-w').value;
+      let h = document.getElementById('gui-stats-h').value;
+      sketchup.update_stats_size(w, h);
     }
   </script>
 </body>

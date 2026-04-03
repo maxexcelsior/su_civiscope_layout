@@ -6,6 +6,7 @@ module CiviscopeLayout
 
     @dialog_stats = nil
     @selection_observer = nil
+    @model_observer = nil
     @entity_observers = {}
     @def_entities_observers = {} 
     @timer_id = nil
@@ -59,7 +60,8 @@ module CiviscopeLayout
         @dialog_stats.bring_to_front; return
       end
       
-      @dialog_stats = UI::HtmlDialog.new({:dialog_title => "📊 统计中心", :width => 320, :height => 550, :style => UI::HtmlDialog::STYLE_DIALOG})
+      w, h = self.get_stats_size
+      @dialog_stats = UI::HtmlDialog.new({:dialog_title => "📊 统计中心", :width => w, :height => h, :style => UI::HtmlDialog::STYLE_DIALOG})
       @dialog_stats.set_file(File.join(__dir__, 'ui', 'ui_stats.html'))
       
       # Ensure overlay is registered
@@ -87,19 +89,35 @@ module CiviscopeLayout
       @dialog_stats.add_action_callback("export_data") { |_, mode| UI.messagebox((mode == 'bldg' ? "建筑" : "用地") + "导出表单功能开发中...") }
       @dialog_stats.add_action_callback("faces_to_sites") { self.do_faces_to_sites }
       @dialog_stats.add_action_callback("ready") { self.refresh_stats_ui(Sketchup.active_model.selection) }
+      @dialog_stats.add_action_callback("on_resized") { |_, w, h| self.save_stats_size(w.to_i, h.to_i) }
       @dialog_stats.set_on_closed { @dialog_stats = nil }
       @dialog_stats.show
       
-      unless @selection_observer
-        @selection_observer = SelectionWatcher.new
-        Sketchup.active_model.selection.add_observer(@selection_observer)
+      # Idempotent Observer Registration
+      model = Sketchup.active_model
+      
+      # Remove old ones if they exist (prevents stacking on reloads)
+      if @selection_observer
+        begin; model.selection.remove_observer(@selection_observer); rescue; end
       end
+      if @model_observer
+        begin; model.remove_observer(@model_observer); rescue; end
+      end
+
+      @selection_observer = SelectionWatcher.new
+      model.selection.add_observer(@selection_observer)
+      
+      @model_observer = ModelWatcher.new
+      model.add_observer(@model_observer)
     end
 
     def self.get_short_id(t); t.persistent_id != 0 ? t.persistent_id.to_s : t.guid.split('-').first; end
 
     def self.get_active_targets(sel)
       model = Sketchup.active_model
+      @nested_bp_warning = false # Reset flag
+      
+      # Handle Active Path (Editing inside a Group)
       if model.active_path && !model.active_path.empty?
         model.active_path.reverse.each do |inst|
           if inst.get_attribute("dynamic_attributes", "bldg_func") || inst.get_attribute("dynamic_attributes", "site_func")
@@ -107,50 +125,122 @@ module CiviscopeLayout
           end
         end
       end
-      sel.grep(Sketchup::Group) + sel.grep(Sketchup::ComponentInstance)
+      
+      processed_targets = []
+      sel.each do |ent|
+        if ent.is_a?(Sketchup::Face)
+          processed_targets << ent
+          next
+        end
+        next unless ent.is_a?(Sketchup::Group) || ent.is_a?(Sketchup::ComponentInstance)
+        
+        
+        is_bldg = ent.get_attribute("dynamic_attributes", "bldg_func")
+        is_site = ent.get_attribute("dynamic_attributes", "site_func")
+        
+        if is_bldg || is_site
+          processed_targets << ent
+        else
+          # Check if this "normal" group is a BP Group (Container)
+          inner_cim = self.collect_cim_entities(ent)
+          if inner_cim.any?
+            # Check for nesting: if inner CIMs are grouped themselves
+            @nested_bp_warning = true if self.detect_nesting?(ent)
+            
+            # Treat the inner Site as the target if it exists, otherwise buildings
+            site = inner_cim.find { |e| e.get_attribute("dynamic_attributes", "site_func") }
+            if site
+              processed_targets << site
+            else
+              processed_targets += inner_cim.select { |e| e.get_attribute("dynamic_attributes", "bldg_func") }
+            end
+          else
+            processed_targets << ent # Still treat as normal group for conversion prompt
+          end
+        end
+      end
+      
+      processed_targets.uniq
+    end
+
+    def self.collect_cim_entities(container)
+      results = []
+      definition = container.is_a?(Sketchup::Group) ? container.definition : container.definition
+      definition.entities.each do |e|
+        next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+        if e.get_attribute("dynamic_attributes", "bldg_func") || e.get_attribute("dynamic_attributes", "site_func")
+          results << e
+        end
+      end
+      results
+    end
+
+    def self.detect_nesting?(container)
+      definition = container.is_a?(Sketchup::Group) ? container.definition : container.definition
+      definition.entities.each do |e|
+        next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+        # If a child contains another CIM entity internally, it's nested
+        inner = self.collect_cim_entities(e)
+        return true if inner.any?
+      end
+      false
     end
 
     def self.refresh_stats_ui(sel)
       return unless @dialog_stats
-      
-      targets = self.get_active_targets(sel)
-      
-      if targets.empty?
-        @dialog_stats.execute_script("showEmptyState()")
-        return
-      end
+      begin
+        targets = self.get_active_targets(sel)
+        
+        if targets.empty?
+          @dialog_stats.execute_script("showEmptyState()")
+          return
+        end
 
-      bldg_targets = targets.select { |t| t.get_attribute("dynamic_attributes", "bldg_func") }
-      site_targets = targets.select { |t| t.get_attribute("dynamic_attributes", "site_func") }
-      normal_targets = targets - bldg_targets - site_targets
-
-      if bldg_targets.any?
-        render_targets('bldg', bldg_targets)
-      elsif site_targets.any?
-        render_targets('site', site_targets)
-      else
-        if @is_tab_switch
-          active_type = @current_active_tab == 'tab-site' ? 'site' : 'bldg'
-          @dialog_stats.execute_script("refreshUI('#{active_type}', 'normal', [], [], {})")
+        # Warning Banner logic
+        if @nested_bp_warning
+          @dialog_stats.execute_script("showBanner('warning', '检测到嵌套的 BP 组。建议一个 BP 组下仅保留一个地块和若干建筑以确保计算准确性。')")
         else
-          first_normal = normal_targets.first
-          if first_normal.respond_to?(:manifold?) && first_normal.manifold?
-            @dialog_stats.execute_script("refreshUI('bldg', 'normal', [], [], {})")
+          @dialog_stats.execute_script("hideBanner()")
+        end
+
+        bldg_targets = targets.select { |t| t.get_attribute("dynamic_attributes", "bldg_func") }
+        site_targets = targets.select { |t| t.get_attribute("dynamic_attributes", "site_func") }
+        normal_targets = targets - bldg_targets - site_targets
+
+        if bldg_targets.any?
+          render_targets('bldg', bldg_targets, sel)
+        elsif site_targets.any?
+          render_targets('site', site_targets, sel)
+        else
+          if @is_tab_switch
+            active_type = @current_active_tab == 'tab-site' ? 'site' : 'bldg'
+            @dialog_stats.execute_script("refreshUI('#{active_type}', 'normal', [], [], {})")
           else
-            @dialog_stats.execute_script("refreshUI('site', 'normal', [], [], {})")
+            first_normal = normal_targets.first
+            if first_normal && first_normal.respond_to?(:manifold?) && first_normal.manifold?
+              @dialog_stats.execute_script("refreshUI('bldg', 'normal', [], [], {})")
+            else
+              @dialog_stats.execute_script("refreshUI('site', 'normal', [], [], {})")
+            end
           end
         end
+      rescue => e
+        puts "[Civiscope Error] UI Refresh Failed: #{e.message}\n#{e.backtrace[0..3].join("\n")}"
       end
     end
 
-    def self.render_targets(type, valid_targets)
+    def self.render_targets(type, valid_targets, sel)
       all_funcs = self.get_all_funcs(type)
       
       if valid_targets.length == 1
         t = valid_targets.first
         self.attach_observers(t)
         
+        sel_array = sel.to_a
+        mode = sel_array.include?(t) ? 'bim' : 'bp_group'
+        
         data = { id: self.get_short_id(t), no: t.get_attribute("dynamic_attributes", "#{type}_no") || "" }
+
         if type == 'bldg'
           data.merge!({
             h: t.get_attribute("dynamic_attributes", "floor_height"),
@@ -161,17 +251,26 @@ module CiviscopeLayout
             area: t.get_attribute("dynamic_attributes", "bldg_area"),
             type: t.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
           })
-          @dialog_stats.execute_script("refreshUI('bldg', 'bim', [], #{all_funcs.to_json}, #{data.to_json})")
+          @dialog_stats.execute_script("refreshUI('bldg', '#{mode}', [], #{all_funcs.to_json}, #{data.to_json})")
         else
           bldgs_in_site = self.find_buildings_on_site(t)
+          # Pre-calculate stats for BP Group mode
+          t_gfa = bldgs_in_site.reduce(0) { |sum, b| sum + (b[:area] || 0) }
+          t_base = bldgs_in_site.reduce(0) { |sum, b| sum + (b[:base_area] || 0) }
+          site_area = t.get_attribute("dynamic_attributes", "site_area").to_f
+          site_area = site_area > 0 ? site_area : 0.001
+          
           data.merge!({
             t: t.get_attribute("dynamic_attributes", "site_type"),
             f: t.get_attribute("dynamic_attributes", "site_func"),
             area: t.get_attribute("dynamic_attributes", "site_area"),
             hl: t.get_attribute("dynamic_attributes", "height_limit") || "0",
-            bldgs: bldgs_in_site
+            bldgs: bldgs_in_site,
+            gfa: t_gfa.round(2),
+            far: (t_gfa / site_area).round(2),
+            density: ((t_base / site_area) * 100).round(1)
           })
-          @dialog_stats.execute_script("refreshUI('site', 'bim', #{SITE_TYPES.to_json}, #{all_funcs.to_json}, #{data.to_json})")
+          @dialog_stats.execute_script("refreshUI('site', '#{mode}', #{SITE_TYPES.to_json}, #{all_funcs.to_json}, #{data.to_json})")
         end
         
       else
@@ -181,13 +280,26 @@ module CiviscopeLayout
           self.attach_observers(t)
           area_val = t.get_attribute("dynamic_attributes", "#{type}_area").to_f
           total_area += area_val
-          list_data << { 
+          
+          item = { 
             id: self.get_short_id(t), 
             no: t.get_attribute("dynamic_attributes", "#{type}_no") || "",
             f: t.get_attribute("dynamic_attributes", "#{type}_func"), 
             t: t.get_attribute("dynamic_attributes", "site_type") || "", 
             area: area_val.round(2) 
           }
+          
+          if type == 'site'
+            bldgs = self.find_buildings_on_site(t)
+            t_gfa = bldgs.reduce(0) { |sum, b| sum + (b[:area] || 0) }
+            t_base = bldgs.reduce(0) { |sum, b| sum + (b[:base_area] || 0) }
+            site_area = area_val > 0 ? area_val : 0.001
+            item[:gfa] = t_gfa.round(2)
+            item[:far] = (t_gfa / site_area).round(2)
+            item[:density] = ((t_base / site_area) * 100).round(1)
+          end
+          
+          list_data << item
         end
         @dialog_stats.execute_script("refreshUI('#{type}', 'multi', [], [], { list: #{list_data.to_json}, totalArea: #{total_area} })")
       end
@@ -198,18 +310,29 @@ module CiviscopeLayout
       bldgs = []
       
       all_bldgs = []
+      # Search in model root
       model.entities.each do |e|
         next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
         all_bldgs << e if e.get_attribute("dynamic_attributes", "bldg_func")
       end
       
+      # Search in sibling context (if nested in a BP group)
+      if site.parent && site.parent.entities
+        site.parent.entities.each do |e|
+          next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
+          next if all_bldgs.include?(e) # Avoid duplicates
+          all_bldgs << e if e.get_attribute("dynamic_attributes", "bldg_func")
+        end
+      end
+      
       all_bldgs.each do |bldg|
-        next unless site.bounds.intersect(bldg.bounds).valid?
+        b_tr = bldg.respond_to?(:world_transformation) ? bldg.world_transformation : bldg.transformation
+        # Correct World Coordinate Calculation
+        local_bottom_center = Geom::Point3d.new(bldg.definition.bounds.center.x, bldg.definition.bounds.center.y, bldg.definition.bounds.min.z)
+        world_bottom_center = local_bottom_center.transform(b_tr)
         
-        center = bldg.bounds.center
-        bottom_center = Geom::Point3d.new(center.x, center.y, bldg.bounds.min.z)
         
-        if self.point_in_site_vertical?(bottom_center, site)
+        if self.point_in_site_vertical?(world_bottom_center, site)
           area = bldg.get_attribute("dynamic_attributes", "bldg_area").to_f || 0.0
           base_area = bldg.get_attribute("dynamic_attributes", "base_area").to_f || 0.0
           bldgs << { 
@@ -224,8 +347,15 @@ module CiviscopeLayout
       bldgs
     end
 
+    def self.bounds_overlap_2d?(b1, b2)
+      return false if b1.min.x > b2.max.x || b2.min.x > b1.max.x
+      return false if b1.min.y > b2.max.y || b2.min.y > b1.max.y
+      true
+    end
+
     def self.point_in_site_vertical?(global_pt, site)
-      tr_inv = site.transformation.inverse
+      tr = site.respond_to?(:world_transformation) ? site.world_transformation : site.transformation
+      tr_inv = tr.inverse
       local_pt = global_pt.transform(tr_inv)
       
       global_pt2 = global_pt + Geom::Vector3d.new(0, 0, -1)
@@ -717,15 +847,39 @@ module CiviscopeLayout
     end
 
     class SelectionWatcher < Sketchup::SelectionObserver
-      def onSelectionBulkChange(sel)
-        UI.stop_timer(@sel_timer_id) if @sel_timer_id
-        @sel_timer_id = UI.start_timer(0.1, false) do
-          CiviscopeLayout::Core.refresh_stats_ui(Sketchup.active_model.selection)
+      def onSelectionBulkChange(sel); trigger_refresh(sel); end
+      def onSelectionCleared(sel); trigger_refresh(sel); end
+      def onSelectionAdded(sel, element); trigger_refresh(sel); end
+      def onSelectionRemoved(sel, element); trigger_refresh(sel); end
+      
+      private
+      
+      def trigger_refresh(sel)
+        begin
+          # Use a debounce timer to avoid overwhelming the UI during fast selection changes
+          @timer_id ||= nil
+          UI.stop_timer(@timer_id) if @timer_id
+          @timer_id = UI.start_timer(0.1, false) do
+            @timer_id = nil
+            begin
+              CiviscopeLayout::Core.refresh_stats_ui(Sketchup.active_model.selection)
+            rescue => inner_e
+              puts "[Civiscope Private Error] Async UI Refresh Failed: #{inner_e.message}"
+            end
+          end
+        rescue => e
+          puts "[Civiscope Private Error] Selection Observer Event Failed: #{e.message}"
         end
       end
-      
-      def onSelectionCleared(sel)
-        CiviscopeLayout::Core.refresh_stats_ui(sel)
+    end
+
+    class ModelWatcher < Sketchup::ModelObserver
+      def onActivePathChanged(model)
+        begin
+          CiviscopeLayout::Core.refresh_stats_ui(model.selection)
+        rescue => e
+          puts "[Civiscope Private Error] Model Observer onActivePathChanged Failed: #{e.message}"
+        end
       end
     end
 
