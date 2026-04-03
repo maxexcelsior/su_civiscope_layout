@@ -7,46 +7,75 @@ module CiviscopeLayout
     @dialog_settings = nil
 
     # ==========================================
-    # 数据存取逻辑
+    # 数据存取逻辑 (本地文件模式)
     # ==========================================
+    def self.config_path
+      File.join(__dir__, 'settings.json')
+    end
+
+    def self.load_config
+      path = self.config_path
+      if File.exist?(path)
+        begin
+          return JSON.parse(File.read(path))
+        rescue => e
+          puts "[Civiscope Settings] Error parsing config file: #{e.message}"
+        end
+      end
+      
+      # 若文件不存在且旧的 read_default 可选，则尝试迁移
+      {}
+    end
+
+    def self.save_config(data)
+      begin
+        File.write(self.config_path, JSON.pretty_generate(data))
+      rescue => e
+        puts "[Civiscope Settings] Error saving config file: #{e.message}"
+      end
+    end
+
     def self.get_all_funcs(type)
       defs = type == 'bldg' ? DEFAULT_BLDG_FUNCS : DEFAULT_SITE_FUNCS
       return defs + self.get_custom_funcs(type)
     end
 
     def self.get_custom_funcs(type)
+      config = self.load_config
       key = type == 'bldg' ? "custom_bldg_funcs" : "custom_site_funcs"
-      raw = Sketchup.read_default(PLUGIN_NAME, key, "")
-      return raw.empty? ? [] : raw.split("||")
+      return config[key] || []
     end
 
     def self.save_custom_funcs(type, arr)
+      config = self.load_config
       key = type == 'bldg' ? "custom_bldg_funcs" : "custom_site_funcs"
-      Sketchup.write_default(PLUGIN_NAME, key, arr.join("||"))
+      config[key] = arr
+      self.save_config(config)
     end
 
     def self.get_custom_colors
-      raw = Sketchup.read_default(PLUGIN_NAME, "custom_colors", "{}")
-      begin
-        JSON.parse(raw)
-      rescue
-        {}
-      end
+      config = self.load_config
+      config["custom_colors"] || {}
     end
 
     def self.save_custom_colors(hash)
-      Sketchup.write_default(PLUGIN_NAME, "custom_colors", hash.to_json)
+      config = self.load_config
+      config["custom_colors"] = hash
+      self.save_config(config)
     end
 
     def self.get_stats_size
-      w = Sketchup.read_default(PLUGIN_NAME, "stats_width", 320).to_i
-      h = Sketchup.read_default(PLUGIN_NAME, "stats_height", 550).to_i
-      [w, h]
+      config = self.load_config
+      w = config["stats_width"] || 320
+      h = config["stats_height"] || 550
+      [w.to_i, h.to_i]
     end
 
     def self.save_stats_size(w, h)
-      Sketchup.write_default(PLUGIN_NAME, "stats_width", w.to_i)
-      Sketchup.write_default(PLUGIN_NAME, "stats_height", h.to_i)
+      config = self.load_config
+      config["stats_width"] = w.to_i
+      config["stats_height"] = h.to_i
+      self.save_config(config)
     end
 
     # ==========================================

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <style>
@@ -140,7 +141,6 @@
       text-align: center;
       color: #999;
       padding: 60px 20px;
-      font-style: italic;
       line-height: 1.6;
     }
 
@@ -163,7 +163,7 @@
       border-bottom: 1px solid #eee;
       text-align: center;
     }
-  
+
     .toolbar-btn {
       flex: 1;
       background: #fff;
@@ -182,26 +182,78 @@
       color: #0056b3;
     }
 
-    .btn-site {
+
+
+    .toolbar-btn.active {
+      background: #e8f5e9;
       border-color: #28a745;
       color: #28a745;
+      font-weight: bold;
     }
 
-    .btn-site:hover {
-      background: #f8f9fa;
-      border-color: #218838;
-      color: #218838;
+    .banner {
+      padding: 8px 12px;
+      font-size: 12px;
+      text-align: center;
     }
-    .banner { padding: 8px 12px; font-size: 12px; text-align: center; }
-    .banner.warning { background: #fff3cd; color: #856404; border-bottom: 1px solid #ffeeba; }
-    .banner.info { background: #d1ecf1; color: #0c5460; border-bottom: 1px solid #bee5eb; }
+
+    .banner.warning {
+      background: #fff3cd;
+      color: #856404;
+      border-bottom: 1px solid #ffeeba;
+    }
+
+    .banner.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border-bottom: 1px solid #bee5eb;
+    }
 
     /* Readonly Grid for BP Group */
-    .readonly-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; margin-top: 10px; }
-    .readonly-item { display: flex; flex-direction: column; background: #fbfbfb; padding: 8px; border-radius: 4px; border: 1px solid #eee; }
-    .readonly-label { font-size: 10px; color: #888; margin-bottom: 2px; }
-    .readonly-value { font-size: 13px; font-weight: bold; color: #333; }
-    .bp-tag { font-size: 10px; background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 10px; font-weight: normal; margin-left: 6px;}
+    .readonly-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .readonly-item {
+      display: flex;
+      flex-direction: column;
+      background: #fbfbfb;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #eee;
+    }
+
+    .readonly-label {
+      font-size: 10px;
+      color: #888;
+      margin-bottom: 2px;
+    }
+
+    .readonly-value {
+      font-size: 13px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .bp-tag {
+      font-size: 10px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: normal;
+      margin-left: 6px;
+    }
+
+    .toolbar-btn.active {
+      background: #4caf50 !important;
+      color: white !important;
+      border-color: #388e3c !important;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
   </style>
 </head>
 
@@ -212,15 +264,39 @@
     <div class="tab" id="btn-tab-site" onclick="userSwitchTab('tab-site')">🗺️ 用地</div>
   </div>
 
-  <div style="display:flex; gap:8px; padding: 10px; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 43px; z-index: 90;">
-    <button id="btn-pick" class="toolbar-btn" onclick="sketchup.start_picker(currentActiveTab === 'tab-bldg' ? 'bldg' : 'site')">🖌️ 建筑功能刷子</button>
-    <button id="btn-face-to-site" class="toolbar-btn btn-site" style="display:none; flex: 1.2;" onclick="sketchup.faces_to_sites()">🟩 面转地块</button>
-    <button id="btn-export" class="toolbar-btn" onclick="sketchup.export_data(currentActiveTab === 'tab-bldg' ? 'bldg' : 'site')">📊 导出表格</button>
+  <div
+    style="padding: 10px; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 43px; z-index: 90;">
+    <div id="toolbar-site" style="display:none; flex-direction: column; gap: 8px;">
+      <div style="display:flex; gap:8px;">
+        <button id="btn-pick-site" class="toolbar-btn" style="flex:1;" onclick="sketchup.start_picker('site')">🖌️
+          属性刷</button>
+        <button id="btn-face-to-site" class="toolbar-btn" style="flex:1;" onclick="sketchup.faces_to_sites()">🟩
+          面转地块</button>
+      </div>
+      <div id="hl-control-group"
+        style="display:flex; flex-direction: column; border: 1px solid #eee; border-radius: 4px; background: #fafafa; overflow: hidden;">
+        <div
+          style="font-size: 10px; font-weight: bold; color: #666; text-align: center; padding: 2px 0; background: #f0f0f0; border-bottom: 1px solid #eee;">
+          地块限高检测</div>
+        <div style="display:flex; gap:0;">
+          <button id="btn-hl-all-on" class="toolbar-btn"
+            style="flex:1; border:none; border-right: 1px solid #eee; border-radius: 0; padding: 5px 2px; font-size: 11px; background: white;"
+            onclick="sketchup.set_all_height_checks(true)">📏 全部开启</button>
+          <button id="btn-hl-all-off" class="toolbar-btn"
+            style="flex:1; border:none; border-radius: 0; padding: 5px 2px; font-size: 11px; background: white;"
+            onclick="sketchup.set_all_height_checks(false)">✖️ 全部关闭</button>
+        </div>
+      </div>
+    </div>
+    <div id="toolbar-bldg" style="display:flex; gap:8px;">
+      <button id="btn-pick-bldg" class="toolbar-btn" style="flex:1;" onclick="sketchup.start_picker('bldg')">🖌️
+        属性刷</button>
+    </div>
   </div>
 
   <div id="global-empty" class="view-box" style="display:block;">
-    ℹ️<br>
-    <span style="font-size:12px;color:#aaa;">包含面或群组均可智能获取</span>
+    👆<br>
+    <span style="font-size:12px;color:#aaa;">选择【体块/面】群组读取信息</span>
   </div>
 
   <div id="tab-bldg" class="tab-content active">
@@ -237,15 +313,17 @@
             onchange="updateBldg()"></div>
         <div class="row"><span class="data-label">建筑层高(m)：</span><input type="number" id="bldg-h" step="0.1"
             onchange="updateBldg()"></div>
-        <div class="row"><span class="data-label">建筑功能：</span><select id="bldg-f" onchange="updateBldg()"></select></div>
+        <div class="row"><span class="data-label">建筑功能：</span><select id="bldg-f" onchange="updateBldg()"></select>
+        </div>
         <div class="row"><span class="data-label">建筑类型：</span><select id="bldg-type" onchange="updateBldg()">
             <option value="塔楼">塔楼</option>
             <option value="裙楼">裙楼</option>
-        </select></div>
+          </select></div>
       </div>
       <div class="card">
         <div class="title">几何属性</div>
-        <div class="row"><span class="data-label">总高度(m)：</span> <input type="number" id="bldg-th" step="0.1" onchange="updateBldg()" style="width: 80px;"></div>
+        <div class="row"><span class="data-label">总高度(m)：</span> <input type="number" id="bldg-th" step="0.1"
+            onchange="updateBldg()" style="width: 80px;"></div>
         <div class="row"><span class="data-label">计容层数：</span> <span class="data-value" id="bldg-fc">0</span> 层</div>
         <div class="row"><span class="data-label">标准层面积：</span> <span class="data-value" id="bldg-ba">0</span> m²
         </div>
@@ -320,7 +398,9 @@
             <span class="readonly-value" id="bp-density">0.0%</span>
           </div>
         </div>
-        <p style="font-size:10px; color:#aaa; margin-top:12px; text-align:center; border-top:1px dashed #eee; padding-top:8px;">提示：双击进入建筑组内部可修改地块属性</p>
+        <p
+          style="font-size:10px; color:#aaa; margin-top:12px; text-align:center; border-top:1px dashed #eee; padding-top:8px;">
+          提示：双击进入建筑组内部可修改地块属性</p>
       </div>
     </div>
 
@@ -332,11 +412,14 @@
             onchange="updateSite()"></div>
         <div class="row"><span class="data-label">大类：</span><select id="site-t" onchange="updateSite()"></select>
         </div>
-        <div class="row"><span class="data-label">用地性质：</span><select id="site-f" onchange="updateSite()"></select></div>
+        <div class="row"><span class="data-label">用地性质：</span><select id="site-f" onchange="updateSite()"></select>
+        </div>
         <div class="row"><span class="data-label">地块限高(m)：</span>
-          <div style="display:flex; gap:4px; align-items:center;">
-             <input type="number" id="site-hl" step="1.0" onchange="updateSite()" style="width: 60px;">
-             <button id="btn-hl-check" class="toolbar-btn" style="padding: 2px 6px; font-size: 11px; margin:0;" onclick="toggleHeightCheck()">📏 高度检测</button>
+          <div style="display:flex; gap:4px; align-items: stretch;">
+            <input type="number" id="site-hl" step="1.0" onchange="updateSite()" style="width: 55px; height: 26px;">
+            <button id="btn-hl-check" class="toolbar-btn"
+              style="padding: 0 6px; font-size: 11px; margin:0; line-height: 24px; min-width: 80px;"
+              onclick="toggleHeightCheck()">📏 开启检测</button>
           </div>
         </div>
       </div>
@@ -369,7 +452,8 @@
           <tfoot>
             <tr>
               <th colspan="2" style="text-align:left; border-top: 2px solid #ddd; padding-top: 5px;">合计总计容建筑面积(m²)</th>
-              <th id="site-bldgs-total" style="text-align:right; border-top: 2px solid #ddd; padding-top: 5px; color:#ffc107;">0.00</th>
+              <th id="site-bldgs-total"
+                style="text-align:right; border-top: 2px solid #ddd; padding-top: 5px; color:#ffc107;">0.00</th>
             </tr>
           </tfoot>
         </table>
@@ -408,12 +492,14 @@
     };
 
     function updateToolbarDisplay(tabId) {
+      const tbSite = document.getElementById('toolbar-site');
+      const tbBldg = document.getElementById('toolbar-bldg');
       if (tabId === 'tab-bldg') {
-        document.getElementById('btn-pick').innerText = "🖌️ 建筑功能刷子";
-        document.getElementById('btn-face-to-site').style.display = "none";
+        if (tbSite) tbSite.style.display = 'none';
+        if (tbBldg) tbBldg.style.display = 'flex';
       } else {
-        document.getElementById('btn-pick').innerText = "🖌️ 用地性质刷子";
-        document.getElementById('btn-face-to-site').style.display = "block";
+        if (tbSite) tbSite.style.display = 'flex';
+        if (tbBldg) tbBldg.style.display = 'none';
       }
     }
 
@@ -433,7 +519,7 @@
       let btnId = tabId === 'tab-bldg' ? 'btn-tab-bldg' : 'btn-tab-site';
       let btn = document.getElementById(btnId);
       if (btn) btn.classList.add('active');
-      
+
       document.querySelectorAll('.tab-content').forEach(el => {
         el.classList.remove('active');
         el.style.display = 'none'; // Force hide all first
@@ -447,19 +533,19 @@
     }
 
     function updateBldg() { sketchup.apply_bldg(document.getElementById('bldg-h').value, document.getElementById('bldg-f').value, document.getElementById('bldg-no').value, document.getElementById('bldg-type').value, document.getElementById('bldg-th').value); }
-    function updateSite() { 
+    function updateSite() {
       let st = document.getElementById('site-t');
       let sf = document.getElementById('site-f').value;
-      
-      if(["公园绿地", "防护绿地", "广场用地", "绿地与广场用地"].includes(sf)) {
+
+      if (["公园绿地", "防护绿地", "广场用地", "绿地与广场用地"].includes(sf)) {
         st.value = "绿地与广场用地";
       } else if (sf === "水域") {
         st.value = "水域";
       } else {
         st.value = "建设用地";
       }
-      
-      sketchup.apply_site(st.value, sf, document.getElementById('site-no').value, document.getElementById('site-hl').value); 
+
+      sketchup.apply_site(st.value, sf, document.getElementById('site-no').value, document.getElementById('site-hl').value);
     }
     function toggleHeightCheck() {
       let idStr = document.getElementById('site-id').innerText.replace("ID: ", "").trim();
@@ -517,7 +603,19 @@
             let tEl = document.getElementById('site-t');
             if (tEl) tEl.innerHTML = buildOptions(types, data.t);
             if (document.getElementById('site-hl')) document.getElementById('site-hl').value = data.hl || "0";
-            
+
+            // Update height check button state
+            let hlBtn = document.getElementById('btn-hl-check');
+            if (hlBtn) {
+              if (data.is_checking) {
+                hlBtn.innerText = "📏 关闭检测";
+                hlBtn.classList.add('active');
+              } else {
+                hlBtn.innerText = "📏 开启检测";
+                hlBtn.classList.remove('active');
+              }
+            }
+
             if (data.bldgs && data.bldgs.length > 0) {
               let bHtml = "";
               let tArea = 0;
@@ -531,11 +629,11 @@
               document.getElementById('site-bldgs-list').innerHTML = bHtml;
               document.getElementById('site-bldgs-total').innerText = tArea.toFixed(2);
               document.getElementById('site-bldgs-card').style.display = 'block';
-              
+
               let site_area = parseFloat(data.area) || 0.001;
               let far = tArea / site_area;
               let density = (tBaseArea / site_area) * 100;
-              
+
               if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = far.toFixed(2); }
               if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = density.toFixed(1); }
             } else {
@@ -544,23 +642,24 @@
               if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = "0.0"; }
             }
           }
-        }
-        else if (mode === 'bp_group') {
+        } else if (mode === 'bp_group') {
           autoSwitchTab(`tab-site`);
           document.getElementById('site-bp-group').style.display = 'block';
-          
+
           document.getElementById('bp-no').innerText = data.no || "-";
           document.getElementById('bp-t').innerText = data.t || "-";
           document.getElementById('bp-f').innerText = data.f || "-";
           document.getElementById('bp-area').innerText = parseFloat(data.area || 0).toFixed(2);
           document.getElementById('bp-hl').innerText = parseFloat(data.hl || 0).toFixed(1);
 
-          // Use pre-calculated values from Ruby for better accuracy and stability
           document.getElementById('bp-gfa').innerText = (data.gfa || 0).toFixed(2);
           document.getElementById('bp-far').innerText = (data.far || 0).toFixed(2);
           document.getElementById('bp-density').innerText = (data.density || 0).toFixed(1) + "%";
         }
-        else if (mode === 'multi') {
+
+
+
+        if (mode === 'multi') {
           autoSwitchTab(`tab-${type}`);
           document.getElementById(`${type}-multi`).style.display = 'block';
           let listHtml = "";
@@ -598,7 +697,7 @@
     }
 
     let resizeTimer;
-    window.onresize = function() {
+    window.onresize = function () {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         sketchup.on_resized(window.outerWidth, window.outerHeight);
@@ -606,4 +705,5 @@
     };
   </script>
 </body>
+
 </html>
