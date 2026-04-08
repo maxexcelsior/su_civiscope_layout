@@ -2,17 +2,6 @@
 module CiviscopeLayout
   module Core
     
-    def self.get_stats_size
-      w = Sketchup.read_default(PLUGIN_NAME, "stats_width", 400).to_i
-      h = Sketchup.read_default(PLUGIN_NAME, "stats_height", 600).to_i
-      [w, h]
-    end
-
-    def self.save_stats_size(w, h)
-      Sketchup.write_default(PLUGIN_NAME, "stats_width", w)
-      Sketchup.write_default(PLUGIN_NAME, "stats_height", h)
-    end
-
     def self.show_stats_dialog
       if @dialog_stats && @dialog_stats.visible?
         @dialog_stats.bring_to_front; return
@@ -20,6 +9,7 @@ module CiviscopeLayout
       
       w, h = self.get_stats_size
       @dialog_stats = UI::HtmlDialog.new({:dialog_title => "📊 统计中心", :width => w, :height => h, :style => UI::HtmlDialog::STYLE_DIALOG})
+      self.center_dialog(@dialog_stats, w, h)
       @dialog_stats.set_file(File.join(__dir__, 'ui_stats.html'))
       
       # Ensure overlay is registered
@@ -47,20 +37,9 @@ module CiviscopeLayout
       @dialog_stats.set_on_closed { @dialog_stats = nil }
       @dialog_stats.show
       
-      # Idempotent Observer Registration
+      # 使用 ObserverManager 注册观察者
       model = Sketchup.active_model
-      if @selection_observer
-        begin; model.selection.remove_observer(@selection_observer); rescue; end
-      end
-      if @model_observer
-        begin; model.remove_observer(@model_observer); rescue; end
-      end
-
-      @selection_observer = SelectionWatcher.new
-      model.selection.add_observer(@selection_observer)
-      
-      @model_observer = ModelWatcher.new
-      model.add_observer(@model_observer)
+      ObserverManager.register_all_observers(model)
     end
 
     def self.refresh_stats_ui(sel)

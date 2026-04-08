@@ -49,27 +49,9 @@ module CiviscopeLayout
       end
     end
 
+    # 附加实体观察者（委托给 ObserverManager）
     def self.attach_observers(entity)
-      return unless entity.is_a?(Sketchup::Group) || entity.is_a?(Sketchup::ComponentInstance)
-      
-      @entity_observers ||= {}
-      @def_entities_observers ||= {}
-      
-      # Attach EntityObserver to the Instance (for Scaling/Transforming)
-      id_str = self.get_short_id(entity)
-      unless @entity_observers[id_str]
-        obs = EntityWatcher.new
-        entity.add_observer(obs)
-        @entity_observers[id_str] = obs
-      end
-      
-      # Attach EntitiesObserver to the Definition (for Push/Pull/Geometry content)
-      definition = entity.is_a?(Sketchup::Group) ? entity.definition : entity.definition
-      unless @def_entities_observers[definition.guid]
-        obs = BimEntitiesWatcher.new(definition)
-        definition.entities.add_observer(obs)
-        @def_entities_observers[definition.guid] = obs
-      end
+      ObserverManager.attach_entity_observers(entity)
     end
 
   end

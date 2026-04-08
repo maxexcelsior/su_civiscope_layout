@@ -87,6 +87,7 @@ module CiviscopeLayout
       end
       
       @dialog_settings = UI::HtmlDialog.new({:dialog_title=>"插件设置", :width=>460, :height=>600, :style=>UI::HtmlDialog::STYLE_DIALOG})
+      self.center_dialog(@dialog_settings, 460, 600)
       @dialog_settings.set_file(File.join(__dir__, 'ui', 'ui_settings.html'))
       
       @dialog_settings.add_action_callback("ready") { self.refresh_settings_ui }
