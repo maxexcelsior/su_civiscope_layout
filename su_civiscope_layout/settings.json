@@ -1,4 +1,14 @@
 {
-  "stats_width": 401,
-  "stats_height": 684
+  "stats_width": 402,
+  "stats_height": 666,
+  "picker_bldg_filter": {
+    "func": true,
+    "floor_height": true,
+    "type": true
+  },
+  "picker_site_filter": {
+    "func": true,
+    "type": true,
+    "height_limit": true
+  }
 }

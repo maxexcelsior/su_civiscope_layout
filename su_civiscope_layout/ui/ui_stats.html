@@ -182,7 +182,16 @@
       color: #0056b3;
     }
 
+    .toolbar-btn .settings-icon {
+      margin-left: 8px;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
 
+    .toolbar-btn .settings-icon:hover {
+      opacity: 1;
+    }
 
     .toolbar-btn.active {
       background: #e8f5e9;
@@ -268,9 +277,10 @@
     style="padding: 10px; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 43px; z-index: 90;">
     <div id="toolbar-site" style="display:none; flex-direction: column; gap: 8px;">
       <!-- Row 1: Pick Site and Internal Greenery -->
-      <div style="display:flex; gap:8px;">
-        <button id="btn-pick-site" class="toolbar-btn" style="flex:1;" onclick="sketchup.start_picker('site')">🖌️
-          属性刷</button>
+      <div style="display:flex; gap:8px; align-items: stretch;">
+        <button id="btn-pick-site" class="toolbar-btn" style="flex:1;" onclick="handlePickerClick(event, 'site')">
+          <span>🖌️ 属性刷</span><span class="settings-icon" title="属性刷设置">⚙️</span>
+        </button>
         <button id="btn-green-tool" class="toolbar-btn" style="flex:1;" onclick="sketchup.activate_greenery_tool()">🌿
           内部绿地</button>
       </div>
@@ -297,9 +307,10 @@
         </div>
       </div>
     </div>
-    <div id="toolbar-bldg" style="display:flex; gap:8px;">
-      <button id="btn-pick-bldg" class="toolbar-btn" style="flex:1;" onclick="sketchup.start_picker('bldg')">🖌️
-        属性刷</button>
+    <div id="toolbar-bldg" style="display:flex; gap:8px; align-items: stretch;">
+      <button id="btn-pick-bldg" class="toolbar-btn" style="flex:1;" onclick="handlePickerClick(event, 'bldg')">
+        <span>🖌️ 属性刷</span><span class="settings-icon" title="属性刷设置">⚙️</span>
+      </button>
     </div>
   </div>
 
@@ -327,6 +338,7 @@
         <div class="row"><span class="data-label">建筑类型：</span><select id="bldg-type" onchange="updateBldg()">
             <option value="塔楼">塔楼</option>
             <option value="裙楼">裙楼</option>
+            <option value="独立">独立</option>
           </select></div>
       </div>
       <div class="card">
@@ -502,6 +514,17 @@
 
   <script>
     let currentActiveTab = 'tab-bldg';
+
+    // 处理属性刷按钮点击，区分点击图标和按钮主体
+    function handlePickerClick(event, type) {
+      // 检查点击目标是否是设置图标
+      if (event.target.classList.contains('settings-icon')) {
+        event.stopPropagation();
+        sketchup.show_picker_settings(type);
+      } else {
+        sketchup.start_picker(type);
+      }
+    }
 
     window.onload = function () {
       let topMargin = Math.max(0, (window.screen.availHeight - 550) / 2);

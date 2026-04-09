@@ -113,8 +113,34 @@ module CiviscopeLayout
     end
 
     def self.calc_site_data(entity, skip_operation = false)
-      # Implementation if needed, currently site area is often from dynamic attributes
-      # placeholder if you ever add automatic site area calculation
+      return unless entity.valid?
+      
+      # 获取地块的definition
+      definition = entity.is_a?(Sketchup::Group) ? entity.definition : entity.definition
+      return unless definition
+      
+      # 计算所有面的面积总和（用地面积）
+      faces = definition.entities.grep(Sketchup::Face)
+      return if faces.empty?
+      
+      # 计算所有面的面积总和（平方英寸）
+      total_area_sq_inch = faces.sum { |f| f.area }
+      
+      # 转换为平方米
+      area_sq_m = total_area_sq_inch * (0.0254 ** 2)
+      
+      # 保存到属性
+      current_area = entity.get_attribute("dynamic_attributes", "site_area").to_f
+      new_area = area_sq_m.round(2)
+      
+      if current_area != new_area
+        model = Sketchup.active_model
+        model.start_operation('更新地块数据', true, false, true) unless skip_operation
+        
+        entity.set_attribute("dynamic_attributes", "site_area", new_area.to_s)
+        
+        model.commit_operation unless skip_operation
+      end
     end
 
     def self.auto_recalculate(entity, skip_ui_refresh = false, skip_operation = false)
@@ -204,11 +230,20 @@ module CiviscopeLayout
         current_mat = ent.material || inherited_mat
         
         if ent.is_a?(Sketchup::Face)
-          # Only count if the effective material matches the target
-          if current_mat == target_mat
+          # Check both front and back material
+          front_mat = ent.material || inherited_mat
+          back_mat = ent.back_material || inherited_mat
+          
+          # Only count if either front or back material matches the target
+          if front_mat == target_mat || back_mat == target_mat
             area_sum += ent.area
           end
         elsif ent.is_a?(Sketchup::Group) || ent.is_a?(Sketchup::ComponentInstance)
+          # Skip boundary groups (used for height limit overlay)
+          if ent.get_attribute("dynamic_attributes", "site_boundary") == "true"
+            next
+          end
+          
           # Recursive scan for sub-entities with inherited material
           definition = ent.is_a?(Sketchup::Group) ? ent.definition : ent.definition
           area_sum += self.sum_green_area(definition.entities, target_mat, current_mat)

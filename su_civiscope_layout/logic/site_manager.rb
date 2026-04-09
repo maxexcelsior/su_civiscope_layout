@@ -17,6 +17,28 @@ module CiviscopeLayout
         inst.set_attribute("dynamic_attributes", "site_func", DEFAULT_SITE_FUNCS[0])
         inst.set_attribute("dynamic_attributes", "site_no", "") 
         
+        # 提取地块外轮廓边线并独立打组（在组件内部）
+        definition = inst.definition
+        boundary_edges = []
+        definition.entities.grep(Sketchup::Face).each do |f|
+          f.outer_loop.edges.each do |edge|
+            boundary_edges << edge
+          end
+        end
+        
+        if boundary_edges.any?
+          # 创建边线组
+          boundary_group = definition.entities.add_group
+          boundary_group.name = "地块边线"
+          boundary_group.set_attribute("dynamic_attributes", "site_boundary", "true")
+          
+          # 复制边线到边线组中（使用顶点位置）
+          # 注意：不调用 find_faces，避免自动生成面
+          boundary_edges.uniq.each do |edge|
+            boundary_group.entities.add_line(edge.start.position, edge.end.position)
+          end
+        end
+        
         self.attach_observers(inst)
         self.auto_recalculate(inst, true, true)
         new_selection << inst
@@ -90,30 +112,34 @@ module CiviscopeLayout
         vec_origin_user = Geom::Vector3d.new(origin_user.x, origin_user.y, origin_user.z)
         
         begin
-          added_edges = []
-          face.loops.each do |loop|
-            pts_global = loop.vertices.map { |v| v.position.transform(tr) }
-            pts_user = pts_global.map { |pt| pt.transform(t_user_inv) }
-            local_pts = pts_user.map { |pt| Geom::Point3d.new(pt.x - origin_user.x, pt.y - origin_user.y, pt.z - origin_user.z) }
-            local_pts.each_with_index do |pt, i|
-              p2 = local_pts[(i+1) % local_pts.length]
-              added_edges << group.entities.add_line(pt, p2)
+          # 直接使用外环顶点创建面（简化逻辑，避免复杂的loop处理）
+          outer_global = face.outer_loop.vertices.map { |v| v.position.transform(tr) }
+          outer_user = outer_global.map { |pt| pt.transform(t_user_inv) }
+          local_pts = outer_user.map { |pt| Geom::Point3d.new(pt.x - origin_user.x, pt.y - origin_user.y, pt.z - origin_user.z) }
+          
+          # 创建面
+          new_face = group.entities.add_face(local_pts) rescue nil
+          
+          if new_face && face.loops.length > 1
+            # 如果原面有内环（孔洞），创建内环边线形成孔洞
+            face.loops[1..-1].each do |inner_loop|
+              inner_global = inner_loop.vertices.map { |v| v.position.transform(tr) }
+              inner_user = inner_global.map { |pt| pt.transform(t_user_inv) }
+              inner_local = inner_user.map { |pt| Geom::Point3d.new(pt.x - origin_user.x, pt.y - origin_user.y, pt.z - origin_user.z) }
+              
+              # 创建内环边线（会自动在面上形成孔洞）
+              inner_local.each_with_index do |pt, i|
+                p2 = inner_local[(i+1) % inner_local.length]
+                group.entities.add_line(pt, p2)
+              end
             end
           end
-          added_edges.compact!
-          added_edges.first.find_faces if added_edges.first
         rescue => e
           puts e.message
         end
         
-        if group.entities.grep(Sketchup::Face).empty?
-          outer_global = face.outer_loop.vertices.map { |v| v.position.transform(tr) }
-          outer_user = outer_global.map { |pt| pt.transform(t_user_inv) }
-          local_pts = outer_user.map { |pt| Geom::Point3d.new(pt.x - origin_user.x, pt.y - origin_user.y, pt.z - origin_user.z) }
-          group.entities.add_face(local_pts) rescue nil
-        end
-        
         if group.entities.grep(Sketchup::Face).length > 0
+          # 先转换为组件，再创建边线组（避免破坏面的几何结构）
           inst = group.to_component
           t_final = t_user * Geom::Transformation.translation(vec_origin_user)
           inst.transform!(t_final)
@@ -122,6 +148,28 @@ module CiviscopeLayout
           inst.set_attribute("dynamic_attributes", "site_type", SITE_TYPES[0]) 
           inst.set_attribute("dynamic_attributes", "site_func", DEFAULT_SITE_FUNCS[0])
           inst.set_attribute("dynamic_attributes", "site_no", "") 
+          
+          # 提取地块外轮廓边线并独立打组（在组件内部）
+          definition = inst.definition
+          boundary_edges = []
+          definition.entities.grep(Sketchup::Face).each do |f|
+            f.outer_loop.edges.each do |edge|
+              boundary_edges << edge
+            end
+          end
+          
+          if boundary_edges.any?
+            # 创建边线组
+            boundary_group = definition.entities.add_group
+            boundary_group.name = "地块边线"
+            boundary_group.set_attribute("dynamic_attributes", "site_boundary", "true")
+            
+            # 复制边线到边线组中（使用顶点位置）
+            # 注意：不调用 find_faces，避免自动生成面
+            boundary_edges.uniq.each do |edge|
+              boundary_group.entities.add_line(edge.start.position, edge.end.position)
+            end
+          end
           
           self.attach_observers(inst)
           self.auto_recalculate(inst, true, true)

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>属性刷设置</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      font-size: 13px;
+    }
+    
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #4CAF50;
+    }
+    
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    
+    .checkbox-item:hover {
+      background: #f0f0f0;
+    }
+    
+    .checkbox-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+    
+    .checkbox-item label {
+      cursor: pointer;
+      user-select: none;
+      flex: 1;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    
+    button {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    
+    .btn-save {
+      background: #4CAF50;
+      color: white;
+    }
+    
+    .btn-save:hover {
+      background: #45a049;
+    }
+    
+    .btn-cancel {
+      background: #e0e0e0;
+      color: #666;
+    }
+    
+    .btn-cancel:hover {
+      background: #d0d0d0;
+    }
+  </style>
+</head>
+<body>
+  <div class="section">
+    <div class="section-title">🏗️ 建筑属性刷</div>
+    <div class="checkbox-group" id="bldg-group">
+      <div class="checkbox-item">
+        <input type="checkbox" id="bldg-func" data-key="func">
+        <label for="bldg-func">建筑功能</label>
+      </div>
+      <div class="checkbox-item">
+        <input type="checkbox" id="bldg-floor-height" data-key="floor_height">
+        <label for="bldg-floor-height">建筑层高</label>
+      </div>
+      <div class="checkbox-item">
+        <input type="checkbox" id="bldg-type" data-key="type">
+        <label for="bldg-type">建筑类型</label>
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <div class="section-title">🗺️ 地块属性刷</div>
+    <div class="checkbox-group" id="site-group">
+      <div class="checkbox-item">
+        <input type="checkbox" id="site-func" data-key="func">
+        <label for="site-func">用地性质</label>
+      </div>
+      <div class="checkbox-item">
+        <input type="checkbox" id="site-type" data-key="type">
+        <label for="site-type">用地大类</label>
+      </div>
+      <div class="checkbox-item">
+        <input type="checkbox" id="site-height-limit" data-key="height_limit">
+        <label for="site-height-limit">建筑限高</label>
+      </div>
+    </div>
+  </div>
+  
+  <div class="button-group">
+    <button class="btn-cancel" onclick="cancel()">取消</button>
+    <button class="btn-save" onclick="save()">保存</button>
+  </div>
+  
+  <script>
+    // 加载配置
+    function loadConfig() {
+      if (typeof sketchup !== 'undefined' && sketchup.load_config) {
+        sketchup.load_config();
+      }
+    }
+    
+    // 渲染配置
+    function renderConfig(config) {
+      // 建筑属性
+      if (config.bldg) {
+        const bldgGroup = document.getElementById('bldg-group');
+        const checkboxes = bldgGroup.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+          const key = cb.getAttribute('data-key');
+          cb.checked = config.bldg[key] !== false;
+        });
+      }
+      
+      // 地块属性
+      if (config.site) {
+        const siteGroup = document.getElementById('site-group');
+        const checkboxes = siteGroup.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+          const key = cb.getAttribute('data-key');
+          cb.checked = config.site[key] !== false;
+        });
+      }
+    }
+    
+    // 保存配置
+    function save() {
+      const bldgFilter = {};
+      const siteFilter = {};
+      
+      // 收集建筑属性
+      const bldgGroup = document.getElementById('bldg-group');
+      const bldgCheckboxes = bldgGroup.querySelectorAll('input[type="checkbox"]');
+      bldgCheckboxes.forEach(cb => {
+        const key = cb.getAttribute('data-key');
+        bldgFilter[key] = cb.checked;
+      });
+      
+      // 收集地块属性
+      const siteGroup = document.getElementById('site-group');
+      const siteCheckboxes = siteGroup.querySelectorAll('input[type="checkbox"]');
+      siteCheckboxes.forEach(cb => {
+        const key = cb.getAttribute('data-key');
+        siteFilter[key] = cb.checked;
+      });
+      
+      // 调用Ruby保存
+      if (typeof sketchup !== 'undefined' && sketchup.save_config) {
+        sketchup.save_config(JSON.stringify(bldgFilter), JSON.stringify(siteFilter));
+      }
+    }
+    
+    // 取消
+    function cancel() {
+      if (typeof sketchup !== 'undefined' && sketchup.close_dialog) {
+        sketchup.close_dialog();
+      }
+    }
+    
+    // 页面加载时初始化
+    window.onload = function() {
+      loadConfig();
+    };
+  </script>
+</body>
+</html>

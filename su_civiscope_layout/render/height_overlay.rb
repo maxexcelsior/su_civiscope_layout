@@ -1,4 +1,6 @@
 # 编码：UTF-8
+require 'set'
+
 module CiviscopeLayout
   module Core
     
@@ -20,7 +22,18 @@ module CiviscopeLayout
           limit_m = site.get_attribute("dynamic_attributes", "height_limit").to_f
           next if limit_m <= 0
           
+          # 根据当前活动路径计算正确的变换
           tr_world = CiviscopeLayout::Core.get_full_world_transform(site)
+          
+          # 检查是否在 CIM 地块组内（活动路径包含该地块）
+          active_path = model.active_path || []
+          if active_path.include?(site)
+            # 在组内时，view 的坐标系是相对于 CIM 地块内部的
+            # 需要用 CIM 地块实例的逆变换来抵消
+            tr_site = site.transformation
+            tr_world = tr_world * tr_site.inverse
+          end
+          
           local_pts = data[:local_pts]
           pts = local_pts.map { |p| p.transform(tr_world) }
           
@@ -107,13 +120,41 @@ module CiviscopeLayout
       definition = site.is_a?(Sketchup::Group) ? site.definition : (site.respond_to?(:definition) ? site.definition : nil)
       return unless definition
       
-      # Use first horizontal face or fallback to bounds
-      face = definition.entities.grep(Sketchup::Face).find { |f| f.normal.z.abs > 0.99 }
-      if face
-        local_pts = face.outer_loop.vertices.map { |v| v.position }
-      else
-        b = definition.bounds
-        local_pts = [b.corner(0), b.corner(1), b.corner(3), b.corner(2)]
+      local_pts = nil
+      
+      # 优先查找地块边线组
+      boundary_group = definition.entities.grep(Sketchup::Group).find do |g|
+        g.get_attribute("dynamic_attributes", "site_boundary") == "true"
+      end
+      
+      if boundary_group
+        # 从边线组提取顶点（需要考虑边线组的变换）
+        edges = boundary_group.entities.grep(Sketchup::Edge)
+        if edges.any?
+          # 获取边线组的变换
+          tr_boundary = boundary_group.transformation
+          
+          # 将边线顶点转换到组件局部坐标系
+          local_pts = self.sort_vertices_by_connection_with_transform(edges, tr_boundary)
+        end
+      end
+      
+      # 如果没有边线组，使用原有逻辑（凸包）
+      unless local_pts
+        horizontal_faces = definition.entities.grep(Sketchup::Face).select { |f| f.normal.z.abs > 0.99 }
+        
+        if horizontal_faces.any?
+          all_vertices = []
+          horizontal_faces.each do |face|
+            face.outer_loop.vertices.each do |v|
+              all_vertices << v.position
+            end
+          end
+          local_pts = self.compute_convex_hull(all_vertices)
+        else
+          b = definition.bounds
+          local_pts = [b.corner(0), b.corner(1), b.corner(3), b.corner(2)]
+        end
       end
       
       @overlay.sites_data[id_str] = { local_pts: local_pts, violated: false }
@@ -165,6 +206,139 @@ module CiviscopeLayout
         end
       end
       data[:violated] = is_violated
+    end
+
+    # 计算凸包（convex hull）- Graham Scan算法
+    def self.compute_convex_hull(points)
+      return points if points.length <= 3
+      
+      # 找到最低点（y最小，如果y相同则x最小）
+      start = points.min_by { |p| [p.y, p.x] }
+      
+      # 按极角排序
+      sorted = points.sort_by do |p|
+        if p == start
+          -1 # 起点排在最前面
+        else
+          angle = Math.atan2(p.y - start.y, p.x - start.x)
+          angle
+        end
+      end
+      
+      # Graham Scan
+      hull = []
+      sorted.each do |p|
+        while hull.length >= 2 && self.cross_product(hull[-2], hull[-1], p) <= 0
+          hull.pop
+        end
+        hull.push(p)
+      end
+      
+      hull
+    end
+
+    # 计算叉积（用于判断方向）
+    def self.cross_product(o, a, b)
+      (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+    end
+
+    # 按连接顺序排序顶点（构建闭合轮廓）
+    def self.sort_vertices_by_connection(edges)
+      return [] if edges.empty?
+      
+      # 构建顶点连接图（使用坐标字符串作为键）
+      connections = {}
+      edges.each do |edge|
+        start_pt = edge.start.position
+        end_pt = edge.end.position
+        
+        start_key = "#{start_pt.x.round(6)},#{start_pt.y.round(6)},#{start_pt.z.round(6)}"
+        end_key = "#{end_pt.x.round(6)},#{end_pt.y.round(6)},#{end_pt.z.round(6)}"
+        
+        connections[start_key] ||= { point: start_pt, neighbors: [] }
+        connections[start_key][:neighbors] << { point: end_pt, key: end_key }
+        
+        connections[end_key] ||= { point: end_pt, neighbors: [] }
+        connections[end_key][:neighbors] << { point: start_pt, key: start_key }
+      end
+      
+      # 从任意一个顶点开始遍历
+      first_key = connections.keys.first
+      start_vertex = connections[first_key][:point]
+      sorted_vertices = [start_vertex]
+      current_key = first_key
+      visited_edges = Set.new
+      
+      while sorted_vertices.length < connections.keys.length
+        # 找到下一个未访问的连接顶点
+        next_data = nil
+        connections[current_key][:neighbors].each do |neighbor_data|
+          # 检查这条边是否已访问（使用坐标字符串组合作为键）
+          edge_key = [current_key, neighbor_data[:key]].sort.join('_')
+          unless visited_edges.include?(edge_key)
+            visited_edges.add(edge_key)
+            next_data = neighbor_data
+            break
+          end
+        end
+        
+        break unless next_data
+        
+        sorted_vertices << next_data[:point]
+        current_key = next_data[:key]
+      end
+      
+      sorted_vertices
+    end
+
+    # 按连接顺序排序顶点（考虑边线组的变换）
+    def self.sort_vertices_by_connection_with_transform(edges, transform)
+      return [] if edges.empty?
+
+      # 构建顶点连接图（使用坐标字符串作为键）
+      connections = {}
+      edges.each do |edge|
+        # 将边线顶点从边线组坐标系转换到组件局部坐标系
+        start_pt = edge.start.position.transform(transform)
+        end_pt = edge.end.position.transform(transform)
+
+        start_key = "#{start_pt.x.round(6)},#{start_pt.y.round(6)},#{start_pt.z.round(6)}"
+        end_key = "#{end_pt.x.round(6)},#{end_pt.y.round(6)},#{end_pt.z.round(6)}"
+
+        connections[start_key] ||= { point: start_pt, neighbors: [] }
+        connections[start_key][:neighbors] << { point: end_pt, key: end_key }
+
+        connections[end_key] ||= { point: end_pt, neighbors: [] }
+        connections[end_key][:neighbors] << { point: start_pt, key: start_key }
+      end
+
+      # 从任意一个顶点开始遍历
+      first_key = connections.keys.first
+      start_vertex = connections[first_key][:point]
+      sorted_vertices = [start_vertex]
+      current_key = first_key
+      visited_edges = Set.new
+
+      while sorted_vertices.length < connections.keys.length
+        # 找到下一个未访问的连接顶点
+        next_data = nil
+        connections[current_key][:neighbors].each do |neighbor_data|
+          # 检查这条边是否已访问（使用坐标字符串组合作为键）
+          edge_key = [current_key, neighbor_data[:key]].sort.join('_')
+          unless visited_edges.include?(edge_key)
+            visited_edges.add(edge_key)
+            next_data = neighbor_data
+            break
+          end
+        end
+
+        break unless next_data
+
+        sorted_vertices << next_data[:point]
+        current_key = next_data[:key]
+      end
+
+      sorted_vertices
     end
 
   end

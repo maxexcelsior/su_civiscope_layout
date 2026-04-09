@@ -78,6 +78,26 @@ module CiviscopeLayout
       self.save_config(config)
     end
 
+    # 属性刷筛选配置
+    def self.get_picker_filter(type)
+      config = self.load_config
+      key = type == 'bldg' ? "picker_bldg_filter" : "picker_site_filter"
+      
+      # 默认配置：建筑(功能、层高、类型)，地块(性质、大类、限高)
+      default = type == 'bldg' ? 
+        {"func" => true, "floor_height" => true, "type" => true} :
+        {"func" => true, "type" => true, "height_limit" => true}
+      
+      config[key] || default
+    end
+
+    def self.save_picker_filter(type, filter_hash)
+      config = self.load_config
+      key = type == 'bldg' ? "picker_bldg_filter" : "picker_site_filter"
+      config[key] = filter_hash
+      self.save_config(config)
+    end
+
     # ==========================================
     # UI 弹窗与交互逻辑
     # ==========================================
@@ -158,6 +178,52 @@ module CiviscopeLayout
       }
       
       @dialog_settings.execute_script("renderLists(#{data.to_json})")
+    end
+
+    # 属性刷设置对话框
+    @dialog_picker_settings = nil
+    
+    def self.show_picker_settings_dialog(type)
+      if @dialog_picker_settings && @dialog_picker_settings.visible?
+        @dialog_picker_settings.bring_to_front; return
+      end
+      
+      @dialog_picker_settings = UI::HtmlDialog.new({
+        :dialog_title => "⚙️ 属性刷设置",
+        :width => 400,
+        :height => 350,
+        :style => UI::HtmlDialog::STYLE_DIALOG
+      })
+      self.center_dialog(@dialog_picker_settings, 400, 350)
+      @dialog_picker_settings.set_file(File.join(__dir__, 'ui', 'ui_picker_settings.html'))
+      
+      @dialog_picker_settings.add_action_callback("load_config") do
+        data = {
+          bldg: self.get_picker_filter('bldg'),
+          site: self.get_picker_filter('site')
+        }
+        @dialog_picker_settings.execute_script("renderConfig(#{data.to_json})")
+      end
+      
+      @dialog_picker_settings.add_action_callback("save_config") do |_, bldg_json, site_json|
+        begin
+          bldg_filter = JSON.parse(bldg_json)
+          site_filter = JSON.parse(site_json)
+          self.save_picker_filter('bldg', bldg_filter)
+          self.save_picker_filter('site', site_filter)
+          UI.messagebox("设置已保存！")
+          @dialog_picker_settings.close
+        rescue => e
+          UI.messagebox("保存失败: #{e.message}")
+        end
+      end
+      
+      @dialog_picker_settings.add_action_callback("close_dialog") do
+        @dialog_picker_settings.close
+      end
+      
+      @dialog_picker_settings.set_on_closed { @dialog_picker_settings = nil }
+      @dialog_picker_settings.show
     end
 
   end

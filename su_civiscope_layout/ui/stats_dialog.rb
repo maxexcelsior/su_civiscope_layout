@@ -29,6 +29,7 @@ module CiviscopeLayout
       @dialog_stats.add_action_callback("toggle_height_check") { |_, id| self.do_toggle_height_check(id) }
       @dialog_stats.add_action_callback("set_all_height_checks") { |_, status| self.do_set_all_height_checks(status) }
       @dialog_stats.add_action_callback("start_picker") { |_, mode| Sketchup.active_model.select_tool(FunctionPickerTool.new(mode)) }
+      @dialog_stats.add_action_callback("show_picker_settings") { |_, type| self.show_picker_settings_dialog(type) }
       @dialog_stats.add_action_callback("export_data") { |_, mode| UI.messagebox((mode == 'bldg' ? "建筑" : "用地") + "导出表单功能开发中...") }
       @dialog_stats.add_action_callback("faces_to_sites") { self.do_faces_to_sites }
       @dialog_stats.add_action_callback("activate_greenery_tool") { self.do_activate_greenery_tool }
