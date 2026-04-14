@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![SketchUp](https://img.shields.io/badge/SketchUp-2024+-orange.svg)](https://www.sketchup.com/)
 
-[功能特性](#功能特性) • [安装](#安装) • [使用方法](#使用方法) • [开发](#开发指南) • [贡献](#贡献指南)
+[功能特性](#features) • [安装](#installation) • [使用方法](#usage) • [开发](#development) • [贡献](#contributing)
 
 </div>
 
@@ -27,7 +27,7 @@
 
 ---
 
-# 🚀 功能特性
+## 🚀 功能特性 <a name="features"></a>
 
 ### 1. 统计中心
 - **实时统计** - 自动计算建筑总面积、容积率、建筑密度等指标
@@ -57,7 +57,7 @@
 
 ---
 
-# 📥 安装
+## 📥 安装 <a name="installation"></a>
 
 ### 方法一：手动安装（推荐）
 
@@ -89,7 +89,7 @@
 
 ---
 
-# 📚 使用方法
+## 📚 使用方法 <a name="usage"></a>
 
 ### 快速开始
 
@@ -122,7 +122,7 @@
 
 ---
 
-# 🛠️ 开发指南
+## 🛠️ 开发指南 <a name="development"></a>
 
 ### 项目结构
 
@@ -193,7 +193,7 @@ CiviscopeLayout::Logger.info("调试信息")
 
 ---
 
-# 🤝 贡献指南
+## 🤝 贡献指南 <a name="contributing"></a>
 
 欢迎所有形式的贡献！无论是报告 Bug、提出新功能建议，还是提交代码改进。
 
