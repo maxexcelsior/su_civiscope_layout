@@ -113,6 +113,9 @@ module CiviscopeLayout
           site_area = t.get_attribute("dynamic_attributes", "site_area").to_f
           site_area = site_area > 0 ? site_area : 0.001
           
+          # 获取地块内所有建筑的实际功能列表（用于筛选）
+          bldg_funcs = bldg_ents.map { |b| b.get_attribute("dynamic_attributes", "bldg_func") }.uniq.compact
+          
           has_global_hl = @overlay && !@overlay.sites_data.empty?
           data.merge!({
             t: t.get_attribute("dynamic_attributes", "site_type"),
@@ -120,6 +123,7 @@ module CiviscopeLayout
             area: t.get_attribute("dynamic_attributes", "site_area"),
             hl: t.get_attribute("dynamic_attributes", "height_limit") || "0",
             bldgs: self.format_bldg_data(bldg_ents),
+            bldg_funcs: bldg_funcs,  # 传递建筑功能列表
             gfa: t_gfa,
             far: (t_gfa / site_area).round(2),
             density: ((t_footprint / site_area) * 100).round(1),

@@ -22,20 +22,38 @@ module CiviscopeLayout
           limit_m = site.get_attribute("dynamic_attributes", "height_limit").to_f
           next if limit_m <= 0
           
-          # 根据当前活动路径计算正确的变换
-          tr_world = CiviscopeLayout::Core.get_full_world_transform(site)
-          
-          # 检查是否在 CIM 地块组内（活动路径包含该地块）
+          # 检查当前活动路径
           active_path = model.active_path || []
-          if active_path.include?(site)
-            # 在组内时，view 的坐标系是相对于 CIM 地块内部的
-            # 需要用 CIM 地块实例的逆变换来抵消
-            tr_site = site.transformation
-            tr_world = tr_world * tr_site.inverse
+          
+          # 判断用户是否在 CIM 地块内部
+          # 方法1：检查 CIM 地块实例是否在活动路径中（适用于组件实例）
+          site_in_path = active_path.include?(site)
+          
+          # 方法2：检查当前活动 entities 的 parent 是否是 CIM 地块的 definition（适用于组）
+          unless site_in_path
+            active_entities = model.active_entities
+            if active_entities && active_entities.parent
+              site_definition = site.is_a?(Sketchup::Group) ? site.definition : site.definition
+              if active_entities.parent == site_definition
+                site_in_path = true
+              end
+            end
           end
           
           local_pts = data[:local_pts]
-          pts = local_pts.map { |p| p.transform(tr_world) }
+          
+          if site_in_path
+            # 用户在 CIM 地块内部
+            # view 的坐标系是 CIM 地块内部的坐标系
+            # local_pts 已经是 CIM 地块内部的局部坐标，直接使用
+            pts = local_pts
+          else
+            # 用户在 CIM 地块外部
+            # view 的坐标系是世界坐标系
+            # 需要将 local_pts 转换到世界坐标系
+            tr_world = CiviscopeLayout::Core.get_full_world_transform(site)
+            pts = local_pts.map { |p| p.transform(tr_world) }
+          end
           
           limit_inch = limit_m / 0.0254
           is_violated = data[:violated]

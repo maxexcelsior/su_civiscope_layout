@@ -105,6 +105,7 @@ module CiviscopeLayout
         {
           id: self.get_short_id(b),
           no: b.get_attribute("dynamic_attributes", "bldg_no") || "",
+          type: b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼",
           f: b.get_attribute("dynamic_attributes", "bldg_func") || "",
           area: b.get_attribute("dynamic_attributes", "bldg_area").to_f.round(2),
           base_area: b.get_attribute("dynamic_attributes", "base_area").to_f.round(2)
@@ -154,7 +155,14 @@ module CiviscopeLayout
         if @overlay && @overlay.respond_to?(:sites_data)
           @overlay.sites_data.keys.each do |site_id|
             site = Sketchup.active_model.find_entity_by_persistent_id(site_id.to_i)
-            site ||= Sketchup.active_model.entities.to_a.find { |e| self.get_short_id(e) == site_id }
+            # 如果在模型根目录找不到，遍历所有组件定义查找地块实例
+            unless site
+              Sketchup.active_model.definitions.each do |d|
+                next if d.image?
+                site = d.instances.find { |i| self.get_short_id(i) == site_id }
+                break if site
+              end
+            end
             if site
               bldgs = self.find_buildings_on_site(site)
               if bldgs.any? { |b| self.get_short_id(b) == self.get_short_id(entity) }

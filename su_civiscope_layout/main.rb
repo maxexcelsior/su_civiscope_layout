@@ -213,6 +213,9 @@ module CiviscopeLayout
     # 3. 注册工具条(Toolbar)
     # ==========================================
     unless file_loaded?(__FILE__)
+      # 注册右键菜单（只注册一次）
+      self.add_context_menu_handler_once
+      
       toolbar = UI::Toolbar.new("Civiscope Layout Tools")
 
       # 工具1：统计

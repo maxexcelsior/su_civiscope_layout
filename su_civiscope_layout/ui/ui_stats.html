@@ -164,6 +164,58 @@
       text-align: center;
     }
 
+    /* 筛选按钮样式 */
+    .filter-btn {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: none;
+      background: transparent;
+      color: #666;
+      font-size: 10px;
+      cursor: pointer;
+      margin-left: 4px;
+      transition: 0.2s;
+    }
+
+    .filter-btn:hover {
+      color: #0056b3;
+      transform: scale(1.2);
+    }
+
+    .filter-btn.active {
+      color: #ffc107;
+    }
+
+    .filter-dropdown {
+      position: absolute;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 4px 0;
+      min-width: 100px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 1000;
+      margin-top: 2px;
+    }
+
+    .filter-option {
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .filter-option:hover {
+      background: #f8f9fa;
+      color: #0056b3;
+    }
+
+    .filter-option.active {
+      background: #ffc107;
+      color: white;
+    }
+
     .toolbar-btn {
       flex: 1;
       background: #fff;
@@ -473,14 +525,27 @@
           <thead>
             <tr>
               <th style="text-align:left;">编号</th>
-              <th>功能</th>
+              <th>
+                建筑类型
+                <button class="filter-btn" id="filter-type-btn" onclick="toggleFilterDropdown('type')" title="筛选建筑类型">▼</button>
+                <div class="filter-dropdown" id="filter-type-dropdown" style="display:none;">
+                  <div class="filter-option" onclick="applyFilter('type', '全部')">全部</div>
+                  <div class="filter-option" onclick="applyFilter('type', '塔楼')">塔楼</div>
+                  <div class="filter-option" onclick="applyFilter('type', '板楼')">板楼</div>
+                </div>
+              </th>
+              <th>
+                功能
+                <button class="filter-btn" id="filter-func-btn" onclick="toggleFilterDropdown('func')" title="筛选建筑功能">▼</button>
+                <div class="filter-dropdown" id="filter-func-dropdown" style="display:none;"></div>
+              </th>
               <th style="text-align:right;">计容建筑面积(m²)</th>
             </tr>
           </thead>
           <tbody id="site-bldgs-list"></tbody>
           <tfoot>
             <tr>
-              <th colspan="2" style="text-align:left; border-top: 2px solid #ddd; padding-top: 5px;">合计总计容建筑面积(m²)</th>
+              <th colspan="3" style="text-align:left; border-top: 2px solid #ddd; padding-top: 5px;">合计总计容建筑面积(m²)</th>
               <th id="site-bldgs-total"
                 style="text-align:right; border-top: 2px solid #ddd; padding-top: 5px; color:#ffc107;">0.00</th>
             </tr>
@@ -514,6 +579,111 @@
 
   <script>
     let currentActiveTab = 'tab-bldg';
+    
+    // 筛选状态和建筑数据
+    let currentBldgsData = [];
+    let activeFilters = { type: '全部', func: '全部' };
+    let availableFuncs = [];
+    
+    // ==========================================
+    // 筛选功能
+    // ==========================================
+    
+    function toggleFilterDropdown(filterType) {
+      const dropdown = document.getElementById(`filter-${filterType}-dropdown`);
+      const btn = document.getElementById(`filter-${filterType}-btn`);
+      
+      // 关闭其他下拉菜单
+      document.querySelectorAll('.filter-dropdown').forEach(d => {
+        if (d.id !== dropdown.id) d.style.display = 'none';
+      });
+      
+      // 切换当前下拉菜单
+      if (dropdown.style.display === 'none') {
+        dropdown.style.display = 'block';
+        btn.classList.add('active');
+        
+        // 动态生成功能筛选选项（首次打开时）
+        if (filterType === 'func' && dropdown.children.length === 0) {
+          dropdown.innerHTML = `<div class="filter-option" onclick="applyFilter('func', '全部')">全部</div>`;
+          availableFuncs.forEach(func => {
+            dropdown.innerHTML += `<div class="filter-option" onclick="applyFilter('func', '${func}')">${func}</div>`;
+          });
+        }
+        
+        // 标记当前选中的选项
+        const options = dropdown.querySelectorAll('.filter-option');
+        options.forEach(opt => {
+          opt.classList.remove('active');
+          if (opt.innerText === activeFilters[filterType]) {
+            opt.classList.add('active');
+          }
+        });
+      } else {
+        dropdown.style.display = 'none';
+        btn.classList.remove('active');
+      }
+    }
+    
+    function applyFilter(filterType, value) {
+      activeFilters[filterType] = value;
+      
+      // 更新按钮状态
+      const btn = document.getElementById(`filter-${filterType}-btn`);
+      if (value === '全部') {
+        btn.classList.remove('active');
+      } else {
+        btn.classList.add('active');
+      }
+      
+      // 关闭下拉菜单
+      document.getElementById(`filter-${filterType}-dropdown`).style.display = 'none';
+      
+      // 重新渲染建筑列表
+      renderBldgsList();
+    }
+    
+    function renderBldgsList() {
+      if (!currentBldgsData || currentBldgsData.length === 0) {
+        document.getElementById('site-bldgs-card').style.display = 'none';
+        return;
+      }
+      
+      // 筛选建筑
+      let filteredBldgs = currentBldgsData;
+      if (activeFilters.type !== '全部') {
+        filteredBldgs = filteredBldgs.filter(b => b.type === activeFilters.type);
+      }
+      if (activeFilters.func !== '全部') {
+        filteredBldgs = filteredBldgs.filter(b => b.f === activeFilters.func);
+      }
+      
+      // 渲染列表
+      let bHtml = "";
+      let tArea = 0;
+      filteredBldgs.forEach(b => {
+        let dNo = b.no ? b.no : "<span style='color:#aaa;'>无编号</span>";
+        bHtml += `<tr>
+          <td style="text-align:left; color:#17a2b8;">${dNo}</td>
+          <td>${b.type}</td>
+          <td>${b.f}</td>
+          <td style="text-align:right; font-weight:bold;">${b.area}</td>
+        </tr>`;
+        tArea += parseFloat(b.area || 0);
+      });
+      
+      document.getElementById('site-bldgs-list').innerHTML = bHtml;
+      document.getElementById('site-bldgs-total').innerText = tArea.toFixed(2);
+      document.getElementById('site-bldgs-card').style.display = 'block';
+    }
+    
+    // 点击其他区域关闭下拉菜单
+    document.addEventListener('click', function(e) {
+      if (!e.target.classList.contains('filter-btn')) {
+        document.querySelectorAll('.filter-dropdown').forEach(d => d.style.display = 'none');
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      }
+    });
 
     // 处理属性刷按钮点击，区分点击图标和按钮主体
     function handlePickerClick(event, type) {
@@ -658,24 +828,27 @@
             }
 
             if (data.bldgs && data.bldgs.length > 0) {
-              let bHtml = "";
-              let tArea = 0;
-              let tBaseArea = 0;
-              data.bldgs.forEach(b => {
-                let dNo = b.no ? b.no : "<span style='color:#aaa;'>无编号</span>";
-                bHtml += `<tr><td style="text-align:left; color:#17a2b8;">${dNo}</td><td>${b.f}</td><td style="text-align:right; font-weight:bold;">${b.area}</td></tr>`;
-                tArea += parseFloat(b.area || 0);
-                tBaseArea += parseFloat(b.base_area || 0);
-              });
-              document.getElementById('site-bldgs-list').innerHTML = bHtml;
-              document.getElementById('site-bldgs-total').innerText = (data.gfa || 0).toFixed(2);
-              document.getElementById('site-bldgs-card').style.display = 'block';
+              // 保存建筑数据和可用功能列表（使用建筑功能，而非地块用地性质）
+              currentBldgsData = data.bldgs;
+              availableFuncs = data.bldg_funcs || [];  // 使用建筑功能列表
+              
+              // 重置筛选状态
+              activeFilters = { type: '全部', func: '全部' };
+              document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+              
+              // 清空功能筛选下拉菜单（下次打开时重新生成）
+              const funcDropdown = document.getElementById('filter-func-dropdown');
+              if (funcDropdown) funcDropdown.innerHTML = '';
+              
+              // 渲染建筑列表
+              renderBldgsList();
 
               if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = (data.far || 0).toFixed(2); }
               if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = (data.density || 0).toFixed(1); }
               if (document.getElementById('site-green-rate')) { document.getElementById('site-green-rate').innerText = (data.green_rate || 0).toFixed(1); }
               if (document.getElementById('site-green-m2')) { document.getElementById('site-green-m2').innerText = (data.green_m2 || 0).toFixed(2); }
             } else {
+              currentBldgsData = [];
               if (document.getElementById('site-bldgs-card')) document.getElementById('site-bldgs-card').style.display = 'none';
               if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = (data.far || 0).toFixed(2); }
               if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = (data.density || 0).toFixed(1); }

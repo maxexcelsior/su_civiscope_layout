@@ -7,13 +7,21 @@ module CiviscopeLayout
     # 右键菜单功能
     # ==========================================
     
-    # 注册右键菜单处理器
-    UI.add_context_menu_handler do |menu|
-      # 添加 CiviscopeLayout 主菜单
-      submenu = menu.add_submenu("CiviscopeLayout")
+    # 注册右键菜单处理器（只在首次加载时注册）
+    @context_menu_handler_added = false
+    
+    def self.add_context_menu_handler_once
+      return if @context_menu_handler_added
       
-      # 添加"重建用地红线"菜单项
-      submenu.add_item("重建用地红线") { self.rebuild_site_boundary }
+      UI.add_context_menu_handler do |menu|
+        # 添加 CiviscopeLayout 主菜单
+        submenu = menu.add_submenu("CiviscopeLayout")
+        
+        # 添加"重建用地红线"菜单项
+        submenu.add_item("重建用地红线") { self.rebuild_site_boundary }
+      end
+      
+      @context_menu_handler_added = true
     end
     
     # ==========================================
