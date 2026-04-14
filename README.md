@@ -85,9 +85,11 @@
    
    工具栏中将出现 "Civiscope Layout Tools" 工具条
 
-### 方法二：Extension Warehouse（即将上线）
+### 方法二：使用扩展程序管理器
 
-插件即将上架 SketchUp Extension Warehouse，届时可通过扩展仓库一键安装。
+1、下载 [Releases](https://github.com/MaxExcelsior/su_civiscope_layout/releases) 页面的su_civiscope_layout.rbz 文件
+
+2、SU菜单栏 → 扩展程序 → 扩展程序管理器 → 安装扩展程序 → 选择 su_civiscope_layout.rbz 打开 → 启用
 
 ---
 
