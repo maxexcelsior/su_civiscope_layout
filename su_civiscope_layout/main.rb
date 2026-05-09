@@ -49,6 +49,7 @@ module CiviscopeLayout
     require_relative 'logic/bldg_manager'
     require_relative 'logic/site_manager'
     require_relative 'logic/stats_engine'
+    require_relative 'logic/building_setback'
     
     # 观察者（新增 observer_manager）
     require_relative 'observers/observer_manager'
@@ -58,6 +59,7 @@ module CiviscopeLayout
     
     # UI 与渲染
     require_relative 'ui/picker_tool'
+    require_relative 'ui/setback_tool'
     require_relative 'ui/context_menu'
     require_relative 'render/height_overlay'
     require_relative 'ui/stats_dialog'
@@ -91,6 +93,7 @@ module CiviscopeLayout
       load File.join(__dir__, 'logic', 'bldg_manager.rb')
       load File.join(__dir__, 'logic', 'site_manager.rb')
       load File.join(__dir__, 'logic', 'stats_engine.rb')
+      load File.join(__dir__, 'logic', 'building_setback.rb')
       
       # 5. 加载观察者（新增 observer_manager）
       load File.join(__dir__, 'observers', 'observer_manager.rb')
@@ -100,6 +103,7 @@ module CiviscopeLayout
       
       # 6. 加载 UI 与渲染
       load File.join(__dir__, 'ui', 'picker_tool.rb')
+      load File.join(__dir__, 'ui', 'setback_tool.rb')
       load File.join(__dir__, 'ui', 'context_menu.rb')
       load File.join(__dir__, 'render', 'height_overlay.rb')
       load File.join(__dir__, 'ui', 'stats_dialog.rb')
@@ -232,21 +236,30 @@ module CiviscopeLayout
       cmd2.large_icon = File.join(__dir__, 'icon', 'setting.svg') if File.exist?(File.join(__dir__, 'icon', 'setting.svg'))
       toolbar.add_item(cmd2)
 
-      # 工具3：导出
+      # 工具3：建筑退线
+      cmd_setback = UI::Command.new("绘制建筑退线") {
+        Sketchup.active_model.select_tool(SetbackTool.new)
+      }
+      cmd_setback.tooltip = "绘制建筑退线 (建筑红线退让)"
+      cmd_setback.small_icon = File.join(__dir__, 'icon', 'setback.svg') if File.exist?(File.join(__dir__, 'icon', 'setback.svg'))
+      cmd_setback.large_icon = File.join(__dir__, 'icon', 'setback.svg') if File.exist?(File.join(__dir__, 'icon', 'setback.svg'))
+      toolbar.add_item(cmd_setback)
+
+      # 工具4：导出
       cmd_exp = UI::Command.new("导出结果") { UI.messagebox("导出表单功能开发中...") }
       cmd_exp.tooltip = "导出统计数据"
       cmd_exp.small_icon = File.join(__dir__, 'icon', 'table.svg') if File.exist?(File.join(__dir__, 'icon', 'table.svg'))
       cmd_exp.large_icon = File.join(__dir__, 'icon', 'table.svg') if File.exist?(File.join(__dir__, 'icon', 'table.svg'))
       toolbar.add_item(cmd_exp)
 
-      # 工具4：关于
+      # 工具5：关于
       cmd3 = UI::Command.new("关于") { self.show_about_dialog }
       cmd3.tooltip = "关于此插件"
       cmd3.small_icon = File.join(__dir__, 'icon', 'info.svg') if File.exist?(File.join(__dir__, 'icon', 'info.svg'))
       cmd3.large_icon = File.join(__dir__, 'icon', 'info.svg') if File.exist?(File.join(__dir__, 'icon', 'info.svg'))
       toolbar.add_item(cmd3)
 
-      # 工具5：重载
+      # 工具6：重载
       cmd4 = UI::Command.new("重载代码") { self.reload }
       cmd4.tooltip = "重新加载插件代码 (开发用)"
       cmd4.small_icon = File.join(__dir__, 'icon', 'reload.svg') if File.exist?(File.join(__dir__, 'icon', 'reload.svg'))

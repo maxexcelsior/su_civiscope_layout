@@ -1,6 +1,6 @@
 {
-  "stats_width": 402,
-  "stats_height": 666,
+  "stats_width": 401,
+  "stats_height": 760,
   "picker_bldg_filter": {
     "func": true,
     "floor_height": true,
@@ -10,5 +10,13 @@
     "func": true,
     "type": true,
     "height_limit": true
+  },
+  "custom_bldg_funcs": [
+    "自定义1",
+    "自定义2"
+  ],
+  "custom_colors": {
+    "自定义2": "#32E16C",
+    "建设用地": "#E3DAC3"
   }
 }

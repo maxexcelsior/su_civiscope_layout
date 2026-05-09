@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>建筑退线设置</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      user-select: none;
+    }
+    .header {
+      background: linear-gradient(135deg, #2c3e50, #34495e);
+      color: #fff;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h2 { font-size: 16px; font-weight: 600; }
+    .header .counter {
+      background: rgba(255,255,255,0.2);
+      padding: 2px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+    .body {
+      padding: 20px 20px 12px;
+    }
+    .edge-label {
+      font-size: 15px;
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 14px;
+      padding: 8px 12px;
+      background: #e8edf2;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .field-group { margin-bottom: 10px; }
+    .field-group label {
+      display: block;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .field-group input {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 16px;
+      border: 2px solid #d0d5dd;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.2s;
+      text-align: center;
+    }
+    .field-group input:focus {
+      border-color: #4c79b6;
+      box-shadow: 0 0 0 2px rgba(76,121,182,0.15);
+    }
+    .field-group input.error {
+      border-color: #e74c3c;
+      box-shadow: 0 0 0 2px rgba(231,76,60,0.15);
+    }
+    .checkbox-row {
+      margin-bottom: 4px;
+      padding: 4px 0;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #444;
+    }
+    .checkbox-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #4c79b6;
+    }
+    .sub-field {
+      margin-bottom: 6px;
+      margin-left: 24px;
+      padding-left: 8px;
+      border-left: 2px solid #27ae60;
+      display: none;
+    }
+    .sub-field.visible { display: block; }
+    .sub-field label {
+      display: block;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 3px;
+    }
+    .sub-field input {
+      width: 100%;
+      padding: 6px 10px;
+      font-size: 14px;
+      border: 2px solid #d0d5dd;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.2s;
+      text-align: center;
+    }
+    .sub-field input:focus {
+      border-color: #4c79b6;
+      box-shadow: 0 0 0 2px rgba(76,121,182,0.15);
+    }
+    .buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .buttons button {
+      flex: 1;
+      padding: 9px 0;
+      font-size: 13px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+    .buttons button:active { opacity: 0.8; }
+    .btn-prev, .btn-next {
+      background: #e8edf2;
+      color: #333;
+    }
+    .btn-prev:hover:not(:disabled), .btn-next:hover:not(:disabled) {
+      background: #d5dce6;
+    }
+    .btn-prev:disabled, .btn-next:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn-generate {
+      background: linear-gradient(135deg, #4c79b6, #3a5f8f);
+      color: #fff;
+    }
+    .btn-generate:hover { background: linear-gradient(135deg, #3a5f8f, #2c4a6e); }
+    .footer {
+      text-align: center;
+      padding: 6px;
+      font-size: 11px;
+      color: #aaa;
+      border-top: 1px solid #e0e0e0;
+    }
+    .error-msg {
+      color: #e74c3c;
+      font-size: 11px;
+      margin-top: 3px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>建筑退线设置</h2>
+    <span class="counter" id="counter">1/1</span>
+  </div>
+  <div class="body">
+    <div class="edge-label" id="edgeLabel">第 1 条边</div>
+
+    <div class="field-group">
+      <label for="roadWidth">相邻道路红线宽度（米）</label>
+      <input type="text" id="roadWidth" inputmode="numeric" value="15" autofocus />
+      <div class="error-msg" id="roadWidthError">请输入有效数字</div>
+    </div>
+
+    <div class="checkbox-row">
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkGreen" />
+        <span>相邻绿地</span>
+      </label>
+    </div>
+    <div class="sub-field" id="greenWidthGroup">
+      <label for="greenWidth">绿地宽度（米）</label>
+      <input type="text" id="greenWidth" inputmode="numeric" value="" />
+    </div>
+
+    <div class="checkbox-row">
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkWater" />
+        <span>相邻水域</span>
+      </label>
+    </div>
+
+    <div class="buttons">
+      <button class="btn-prev" id="btnPrev">上一条</button>
+      <button class="btn-next" id="btnNext">下一条</button>
+      <button class="btn-generate" id="btnGenerate">生成退线</button>
+    </div>
+  </div>
+  <div class="footer">设定参数后点击"生成退线"统一绘制</div>
+
+  <script>
+    var state = {
+      groups: [],
+      edges: [],
+      currentIndex: 0
+    };
+
+    // ========== 工具函数 ==========
+    function isDefaultEdge(edge) {
+      return edge.roadWidth === "15" && !edge.isGreen && !edge.isWater && edge.greenWidth === "";
+    }
+
+    function createDefaultEdge() {
+      return { roadWidth: "15", isGreen: false, isWater: false, greenWidth: "" };
+    }
+
+    function isValidNumber(str) {
+      if (str === "" || str === null || str === undefined) return false;
+      var val = parseFloat(str);
+      return !isNaN(val) && val >= 0 && String(val) === str.trim();
+    }
+
+    function getEdgeInput() {
+      return {
+        roadWidth: document.getElementById('roadWidth').value,
+        isGreen: document.getElementById('chkGreen').checked,
+        isWater: document.getElementById('chkWater').checked,
+        greenWidth: document.getElementById('greenWidth').value
+      };
+    }
+
+    function setEdgeInput(edge) {
+      document.getElementById('roadWidth').value = edge.roadWidth;
+      document.getElementById('chkGreen').checked = edge.isGreen;
+      document.getElementById('chkWater').checked = edge.isWater;
+      document.getElementById('greenWidth').value = edge.greenWidth;
+      updateSubFields();
+    }
+
+    function saveCurrentEdge() {
+      state.edges[state.currentIndex] = getEdgeInput();
+    }
+
+    function loadCurrentEdge() {
+      setEdgeInput(state.edges[state.currentIndex]);
+    }
+
+    function updateSubFields() {
+      var showGreen = document.getElementById('chkGreen').checked;
+      document.getElementById('greenWidthGroup').className = 'sub-field' + (showGreen ? ' visible' : '');
+      // 互相排斥：勾绿地 → 取消水域，反之亦然
+      if (showGreen) {
+        document.getElementById('chkWater').checked = false;
+        // 禁用道路宽度标红
+        document.getElementById('roadWidth').className = '';
+        document.getElementById('roadWidthError').className = 'error-msg';
+      }
+      if (document.getElementById('chkWater').checked) {
+        document.getElementById('chkGreen').checked = false;
+        document.getElementById('greenWidthGroup').className = 'sub-field';
+      }
+    }
+
+    function selectInputText() {
+      document.getElementById('roadWidth').focus();
+      document.getElementById('roadWidth').select();
+    }
+
+    function clearError() {
+      document.getElementById('roadWidth').className = '';
+      document.getElementById('roadWidthError').className = 'error-msg';
+    }
+
+    function showError(msg) {
+      document.getElementById('roadWidth').className = 'error';
+      document.getElementById('roadWidthError').textContent = msg;
+      document.getElementById('roadWidthError').className = 'error-msg visible';
+    }
+
+    // 校验当前边的输入是否合法
+    function validateCurrentEdge() {
+      var edge = getEdgeInput();
+      // 如果勾选了水域，跳过道路宽度校验
+      if (edge.isWater) return true;
+      // 绿地：道路宽度可选（用于计算），绿地宽度必填
+      if (edge.isGreen) {
+        if (!isValidNumber(edge.greenWidth)) {
+          showError('请填写有效的绿地宽度数字');
+          document.getElementById('greenWidth').focus();
+          document.getElementById('greenWidth').select();
+          return false;
+        }
+        return true;
+      }
+      // 普通情况：道路宽度必填且为数字
+      if (!isValidNumber(edge.roadWidth)) {
+        showError('请输入有效数字作为道路红线宽度');
+        return false;
+      }
+      return true;
+    }
+
+    // ========== 界面更新 ==========
+    function setData(labels) {
+      state.groups = labels;
+      state.edges = labels.map(function() { return createDefaultEdge(); });
+      state.currentIndex = 0;
+      loadCurrentEdge();
+      updateUI();
+      syncValuesToRuby();
+      selectInputText();
+    }
+
+    function updateUI() {
+      var idx = state.currentIndex;
+      var total = state.groups.length;
+      document.getElementById('counter').textContent = (idx + 1) + '/' + total;
+      document.getElementById('edgeLabel').textContent = state.groups[idx];
+      document.getElementById('btnPrev').disabled = (idx === 0);
+    }
+
+    function navigate(delta) {
+      if (!validateCurrentEdge()) return;
+      saveCurrentEdge();
+
+      var prev = state.edges[state.currentIndex];
+      var total = state.groups.length;
+      state.currentIndex = (state.currentIndex + delta + total) % total;
+
+      // 下一条边若为默认值，自动沿用上一条边的参数
+      if (delta === 1 && isDefaultEdge(state.edges[state.currentIndex])) {
+        state.edges[state.currentIndex] = {
+          roadWidth: prev.roadWidth,
+          isGreen: prev.isGreen,
+          isWater: prev.isWater,
+          greenWidth: prev.greenWidth
+        };
+      }
+
+      loadCurrentEdge();
+      updateUI();
+      clearError();
+      selectInputText();
+      syncValuesToRuby();
+    }
+
+    function syncValuesToRuby() {
+      try {
+        sketchup.sync_values(JSON.stringify({
+          edges: state.edges,
+          currentIndex: state.currentIndex
+        }));
+      } catch(e) {}
+    }
+
+    // ========== 事件绑定 ==========
+    document.getElementById('chkGreen').addEventListener('change', function() {
+      updateSubFields();
+      if (this.checked) {
+        document.getElementById('chkWater').checked = false;
+        document.getElementById('greenWidth').focus();
+      }
+    });
+
+    document.getElementById('chkWater').addEventListener('change', function() {
+      updateSubFields();
+      if (this.checked) {
+        document.getElementById('chkGreen').checked = false;
+        document.getElementById('roadWidth').focus();
+      }
+    });
+
+    document.getElementById('btnPrev').addEventListener('click', function() { navigate(-1); });
+    document.getElementById('btnNext').addEventListener('click', function() { navigate(1); });
+
+    document.getElementById('btnGenerate').addEventListener('click', function() {
+      if (!validateCurrentEdge()) return;
+      saveCurrentEdge();
+      try {
+        sketchup.generate_setbacks(JSON.stringify({
+          edges: state.edges,
+          currentIndex: state.currentIndex
+        }));
+      } catch(e) {}
+    });
+
+    // 输入框联动：任何变化实时保存
+    document.getElementById('roadWidth').addEventListener('input', function() {
+      clearError();
+    });
+    document.getElementById('greenWidth').addEventListener('input', function() {
+      // 空
+    });
+
+    // 键盘支持
+    document.getElementById('roadWidth').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.ctrlKey) {
+        e.preventDefault();
+        navigate(1);
+      } else if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        document.getElementById('btnGenerate').click();
+      }
+    });
+    document.getElementById('greenWidth').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.ctrlKey) {
+        e.preventDefault();
+        navigate(1);
+      } else if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        document.getElementById('btnGenerate').click();
+      }
+    });
+
+    window.onload = function() {
+      try { sketchup.ready(); } catch(e) {}
+    };
+  </script>
+</body>
+</html>
