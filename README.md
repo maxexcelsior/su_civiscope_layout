@@ -8,9 +8,11 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![SketchUp](https://img.shields.io/badge/SketchUp-2024+-orange.svg)](https://www.sketchup.com/)
 
-[功能特性](#功能特性) • [安装](#安装) • [使用方法](#使用方法) • [开发](#开发指南) • [贡献](#贡献指南)
+[功能特性](#features) • [安装](#installation) • [使用方法](#usage) • [开发](#development) • [贡献](#contributing)
 
 </div>
+
+<img width="1586" height="1053" alt="image" src="https://github.com/user-attachments/assets/981a8182-5872-4fe1-b595-cfc7aaa93528" />
 
 ---
 
@@ -27,7 +29,7 @@
 
 ---
 
-## 🚀 功能特性
+## 🚀 功能特性 <a name="features"></a>
 
 ### 1. 统计中心
 - **实时统计** - 自动计算建筑总面积、容积率、建筑密度等指标
@@ -57,7 +59,7 @@
 
 ---
 
-## 📥 安装
+## 📥 安装 <a name="installation"></a>
 
 ### 方法一：手动安装（推荐）
 
@@ -83,13 +85,15 @@
    
    工具栏中将出现 "Civiscope Layout Tools" 工具条
 
-### 方法二：Extension Warehouse（即将上线）
+### 方法二：使用扩展程序管理器
 
-插件即将上架 SketchUp Extension Warehouse，届时可通过扩展仓库一键安装。
+1、下载 [Releases](https://github.com/MaxExcelsior/su_civiscope_layout/releases) 页面的su_civiscope_layout.rbz 文件
+
+2、SU菜单栏 → 扩展程序 → 扩展程序管理器 → 安装扩展程序 → 选择 su_civiscope_layout.rbz 打开 → 启用
 
 ---
 
-## 📚 使用方法
+## 📚 使用方法 <a name="usage"></a>
 
 ### 快速开始
 
@@ -122,7 +126,7 @@
 
 ---
 
-## 🛠️ 开发指南
+## 🛠️ 开发指南 <a name="development"></a>
 
 ### 项目结构
 
@@ -193,7 +197,7 @@ CiviscopeLayout::Logger.info("调试信息")
 
 ---
 
-## 🤝 贡献指南
+## 🤝 贡献指南 <a name="contributing"></a>
 
 欢迎所有形式的贡献！无论是报告 Bug、提出新功能建议，还是提交代码改进。
 
