@@ -101,14 +101,21 @@ module CiviscopeLayout
     end
 
     def self.format_bldg_data(entities)
+      reduction_enabled = CiviscopeLayout::Core.get_reduction_settings['enabled']
       entities.map do |b|
+        bldg_type = b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+        area = b.get_attribute("dynamic_attributes", "bldg_area").to_f.round(2)
+        h_for_reduction = CiviscopeLayout::Core.get_height_for_reduction(b)
+        factor = CiviscopeLayout::Core.compute_reduction_factor(bldg_type, h_for_reduction)
+        reduced_area = (area * factor).round(2)
         {
           id: self.get_short_id(b),
           no: b.get_attribute("dynamic_attributes", "bldg_no") || "",
-          type: b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼",
+          type: bldg_type,
           f: b.get_attribute("dynamic_attributes", "bldg_func") || "",
-          area: b.get_attribute("dynamic_attributes", "bldg_area").to_f.round(2),
-          base_area: b.get_attribute("dynamic_attributes", "base_area").to_f.round(2)
+          area: area,
+          base_area: b.get_attribute("dynamic_attributes", "base_area").to_f.round(2),
+          reduced_area: reduction_enabled ? reduced_area : nil
         }
       end
     end
@@ -145,13 +152,37 @@ module CiviscopeLayout
     end
 
     def self.auto_recalculate(entity, skip_ui_refresh = false, skip_operation = false)
+      eid = get_short_id(entity) rescue '?'
+      puts "[DEBUG-FL] auto_recalculate ENTER entity=#{eid} valid=#{entity.valid?} skip_ui=#{skip_ui_refresh} skip_op=#{skip_operation}"
+      @pending_recalc_entity = nil
+      UI.stop_timer(@safety_timer_id) if @safety_timer_id
+      @safety_timer_id = nil
       return unless entity.valid?
-      
+
       if entity.get_attribute("dynamic_attributes", "bldg_func")
+        puts "[DEBUG-FL] auto_recalculate → calc_bldg_data for bldg_func=#{entity.get_attribute("dynamic_attributes", "bldg_func")}"
         bldg_func = entity.get_attribute("dynamic_attributes", "bldg_func")
         self.apply_material(entity, bldg_func)
         self.calc_bldg_data(entity, skip_operation)
-        
+
+        # 级联：裙楼高度变化时重算上方塔楼
+        bldg_type = entity.get_attribute("dynamic_attributes", "bldg_type") || ""
+        if bldg_type == "裙楼"
+          entity_world_top = self.get_world_z(entity, :top)
+          if entity_world_top
+            self.find_sibling_buildings(entity).each do |sib|
+              next if sib == entity
+              sib_type = sib.get_attribute("dynamic_attributes", "bldg_type") || ""
+              next unless sib_type == "塔楼"
+              sib_world_bottom = self.get_world_z(sib, :bottom)
+              next unless sib_world_bottom
+              if (sib_world_bottom - entity_world_top).abs < 1.0
+                self.calc_bldg_data(sib, skip_operation)
+              end
+            end
+          end
+        end
+
         if @overlay && @overlay.respond_to?(:sites_data)
           @overlay.sites_data.keys.each do |site_id|
             site = Sketchup.active_model.find_entity_by_persistent_id(site_id.to_i)
@@ -190,48 +221,36 @@ module CiviscopeLayout
 
     def self.calculate_site_metrics(site_entity, bldg_entities)
       total_gfa = 0.0
-      deduplicated_base_area = 0.0
+      base_area = 0.0
       green_area = 0.0
-      
+
       # 1. Calc GFA (always sum all)
       bldg_entities.each do |b|
         total_gfa += b.get_attribute("dynamic_attributes", "bldg_area").to_f
       end
-      
-      # 2. Calc Footprint with Nesting Check
-      sorted_bldgs = bldg_entities.sort_by { |b| b.get_attribute("dynamic_attributes", "base_area").to_f }.reverse
-      sorted_bldgs.each_with_index do |child, i|
-        is_nested = false
-        child_area = child.get_attribute("dynamic_attributes", "base_area").to_f
-        sorted_bldgs.each_with_index do |parent, j|
-          next if i == j
-          parent_area = parent.get_attribute("dynamic_attributes", "base_area").to_f
-          next if parent_area < child_area - 0.1
-          if CiviscopeLayout::Core.is_bldg_nested?(child, parent)
-            is_nested = true; break
-          end
+
+      # 2. Calc Base Area & Green Area via material scan
+      if site_entity && site_entity.valid?
+        model = Sketchup.active_model
+        entities = site_entity.is_a?(Sketchup::Group) ? site_entity.definition.entities : site_entity.definition.entities
+
+        base_mat = model.materials["Civiscope_建筑基底"]
+        if base_mat
+          base_area_sq_ins = self.sum_material_area(entities, base_mat)
+          base_area = base_area_sq_ins * (0.0254 ** 2)
         end
-        deduplicated_base_area += child_area unless is_nested
+
+        green_mat = model.materials["Civiscope_内部绿地"]
+        if green_mat
+          green_area_sq_ins = self.sum_material_area(entities, green_mat)
+          green_area = green_area_sq_ins * (0.0254 ** 2)
+        end
       end
 
-      # 3. Calc Green Area (Recursive scan for material)
-      if site_entity && site_entity.valid?
-        green_mat_name = "Civiscope_内部绿地"
-        model = Sketchup.active_model
-        target_mat = model.materials[green_mat_name]
-        
-        green_area_sq_ins = 0.0
-        if target_mat
-          entities = site_entity.is_a?(Sketchup::Group) ? site_entity.definition.entities : site_entity.definition.entities
-          green_area_sq_ins = self.sum_green_area(entities, target_mat)
-        end
-        green_area = green_area_sq_ins * (0.0254 ** 2)
-      end
-      
-      [total_gfa.round(2), deduplicated_base_area.round(2), green_area.round(2)]
+      [total_gfa.round(2), base_area.round(2), green_area.round(2)]
     end
 
-    def self.sum_green_area(entities, target_mat, inherited_mat = nil)
+    def self.sum_material_area(entities, target_mat, inherited_mat = nil)
       area_sum = 0.0
       entities.each do |ent|
         # Determine effective material (local or inherited)
@@ -254,7 +273,7 @@ module CiviscopeLayout
           
           # Recursive scan for sub-entities with inherited material
           definition = ent.is_a?(Sketchup::Group) ? ent.definition : ent.definition
-          area_sum += self.sum_green_area(definition.entities, target_mat, current_mat)
+          area_sum += self.sum_material_area(definition.entities, target_mat, current_mat)
         end
       end
       area_sum

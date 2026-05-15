@@ -60,6 +60,11 @@
       border-color: #4c79b6;
       box-shadow: 0 0 0 2px rgba(76,121,182,0.15);
     }
+    .field-group input:disabled {
+      background: #e9ecef;
+      color: #888;
+      cursor: not-allowed;
+    }
     .field-group input.error {
       border-color: #e74c3c;
       box-shadow: 0 0 0 2px rgba(231,76,60,0.15);
@@ -174,6 +179,13 @@
 
     <div class="checkbox-row">
       <label class="checkbox-label">
+        <input type="checkbox" id="chkAdjacentLand" />
+        <span>相邻用地</span>
+      </label>
+    </div>
+
+    <div class="checkbox-row">
+      <label class="checkbox-label">
         <input type="checkbox" id="chkGreen" />
         <span>相邻绿地</span>
       </label>
@@ -207,11 +219,11 @@
 
     // ========== 工具函数 ==========
     function isDefaultEdge(edge) {
-      return edge.roadWidth === "15" && !edge.isGreen && !edge.isWater && edge.greenWidth === "";
+      return edge.roadWidth === "15" && !edge.isAdjacentLand && !edge.isGreen && !edge.isWater && edge.greenWidth === "";
     }
 
     function createDefaultEdge() {
-      return { roadWidth: "15", isGreen: false, isWater: false, greenWidth: "" };
+      return { roadWidth: "15", isAdjacentLand: false, isGreen: false, isWater: false, greenWidth: "" };
     }
 
     function isValidNumber(str) {
@@ -223,6 +235,7 @@
     function getEdgeInput() {
       return {
         roadWidth: document.getElementById('roadWidth').value,
+        isAdjacentLand: document.getElementById('chkAdjacentLand').checked,
         isGreen: document.getElementById('chkGreen').checked,
         isWater: document.getElementById('chkWater').checked,
         greenWidth: document.getElementById('greenWidth').value
@@ -231,6 +244,7 @@
 
     function setEdgeInput(edge) {
       document.getElementById('roadWidth').value = edge.roadWidth;
+      document.getElementById('chkAdjacentLand').checked = edge.isAdjacentLand;
       document.getElementById('chkGreen').checked = edge.isGreen;
       document.getElementById('chkWater').checked = edge.isWater;
       document.getElementById('greenWidth').value = edge.greenWidth;
@@ -246,17 +260,39 @@
     }
 
     function updateSubFields() {
+      var isAdjacentLand = document.getElementById('chkAdjacentLand').checked;
       var showGreen = document.getElementById('chkGreen').checked;
       document.getElementById('greenWidthGroup').className = 'sub-field' + (showGreen ? ' visible' : '');
-      // 互相排斥：勾绿地 → 取消水域，反之亦然
+
+      // 相邻用地：道路宽度归0且禁用，绿地/水域禁用
+      if (isAdjacentLand) {
+        document.getElementById('roadWidth').value = '0';
+        document.getElementById('roadWidth').disabled = true;
+        document.getElementById('chkGreen').checked = false;
+        document.getElementById('chkGreen').disabled = true;
+        document.getElementById('chkWater').checked = false;
+        document.getElementById('chkWater').disabled = true;
+        document.getElementById('greenWidthGroup').className = 'sub-field';
+        document.getElementById('roadWidth').className = '';
+        document.getElementById('roadWidthError').className = 'error-msg';
+        return;
+      }
+
+      // 非相邻用地：恢复道路宽度和绿地/水域
+      document.getElementById('roadWidth').disabled = false;
+      document.getElementById('chkGreen').disabled = false;
+      document.getElementById('chkWater').disabled = false;
+
+      // 互相排斥：勾绿地 → 取消水域和相邻用地，反之亦然
       if (showGreen) {
         document.getElementById('chkWater').checked = false;
-        // 禁用道路宽度标红
+        document.getElementById('chkAdjacentLand').checked = false;
         document.getElementById('roadWidth').className = '';
         document.getElementById('roadWidthError').className = 'error-msg';
       }
       if (document.getElementById('chkWater').checked) {
         document.getElementById('chkGreen').checked = false;
+        document.getElementById('chkAdjacentLand').checked = false;
         document.getElementById('greenWidthGroup').className = 'sub-field';
       }
     }
@@ -280,6 +316,8 @@
     // 校验当前边的输入是否合法
     function validateCurrentEdge() {
       var edge = getEdgeInput();
+      // 相邻用地：跳过所有校验
+      if (edge.isAdjacentLand) return true;
       // 如果勾选了水域，跳过道路宽度校验
       if (edge.isWater) return true;
       // 绿地：道路宽度可选（用于计算），绿地宽度必填
@@ -331,6 +369,7 @@
       if (delta === 1 && isDefaultEdge(state.edges[state.currentIndex])) {
         state.edges[state.currentIndex] = {
           roadWidth: prev.roadWidth,
+          isAdjacentLand: prev.isAdjacentLand,
           isGreen: prev.isGreen,
           isWater: prev.isWater,
           greenWidth: prev.greenWidth
@@ -354,10 +393,19 @@
     }
 
     // ========== 事件绑定 ==========
+    document.getElementById('chkAdjacentLand').addEventListener('change', function() {
+      updateSubFields();
+      if (this.checked) {
+        document.getElementById('chkGreen').checked = false;
+        document.getElementById('chkWater').checked = false;
+      }
+    });
+
     document.getElementById('chkGreen').addEventListener('change', function() {
       updateSubFields();
       if (this.checked) {
         document.getElementById('chkWater').checked = false;
+        document.getElementById('chkAdjacentLand').checked = false;
         document.getElementById('greenWidth').focus();
       }
     });
@@ -366,6 +414,7 @@
       updateSubFields();
       if (this.checked) {
         document.getElementById('chkGreen').checked = false;
+        document.getElementById('chkAdjacentLand').checked = false;
         document.getElementById('roadWidth').focus();
       }
     });

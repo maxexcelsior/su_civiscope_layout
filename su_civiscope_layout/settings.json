@@ -12,11 +12,71 @@
     "height_limit": true
   },
   "custom_bldg_funcs": [
-    "自定义1",
-    "自定义2"
+    "体育"
   ],
   "custom_colors": {
-    "自定义2": "#32E16C",
-    "建设用地": "#E3DAC3"
-  }
+    "建设用地": "#E3DAC3",
+    "体育": "#96DBC9"
+  },
+  "overlay_number_color": "#ff0a0a",
+  "overlay_number_size": 31,
+  "overlay_number_height": 50.0,
+  "overlay_use_height_limit": true,
+  "reduction_enabled": true,
+  "podium_reduction": [
+    [
+      12,
+      0.95
+    ],
+    [
+      24,
+      0.9
+    ],
+    [
+      30,
+      0.85
+    ],
+    [
+      40,
+      0.8
+    ]
+  ],
+  "tower_reduction": [
+    [
+      100,
+      0.95
+    ],
+    [
+      150,
+      0.92
+    ],
+    [
+      200,
+      0.89
+    ],
+    [
+      250,
+      0.86
+    ],
+    [
+      300,
+      0.83
+    ],
+    [
+      350,
+      0.79
+    ],
+    [
+      400,
+      0.76
+    ],
+    [
+      450,
+      0.73
+    ],
+    [
+      500,
+      0.7
+    ]
+  ]
 }

@@ -333,8 +333,10 @@
         <button id="btn-pick-site" class="toolbar-btn" style="flex:1;" onclick="handlePickerClick(event, 'site')">
           <span>🖌️ 属性刷</span><span class="settings-icon" title="属性刷设置">⚙️</span>
         </button>
-        <button id="btn-green-tool" class="toolbar-btn" style="flex:1;" onclick="sketchup.activate_greenery_tool()">🌿
-          内部绿地</button>
+        <div style="flex:1; display:flex; gap:0;">
+          <button id="btn-green-tool" class="toolbar-btn" style="flex:1; border-right:1px solid #ddd; border-radius:4px 0 0 4px;" onclick="sketchup.activate_greenery_tool()">🌿 内部绿地</button>
+          <button id="btn-base-tool" class="toolbar-btn" style="flex:1; border-radius:0 4px 4px 0;" onclick="sketchup.activate_base_tool()">🏗️ 建筑基底</button>
+        </div>
       </div>
       <!-- Row 2: Face to Site and Height Limit Control -->
       <div style="display:flex; gap:8px; align-items: stretch;">
@@ -395,14 +397,19 @@
       </div>
       <div class="card">
         <div class="title">几何属性</div>
-        <div class="row"><span class="data-label">总高度(m)：</span> <input type="number" id="bldg-th" step="0.1"
+        <div class="row"><span class="data-label" id="bldg-th-label">总高度(m)：</span> <input type="number" id="bldg-th" step="0.1"
             onchange="updateBldg()" style="width: 80px;"></div>
+        <div class="row" id="bldg-he-row" style="display:none;"><span class="data-label">建筑真高（塔楼+裙楼）(m)：</span> <span class="data-value" id="bldg-he">0</span></div>
         <div class="row"><span class="data-label">计容层数：</span> <span class="data-value" id="bldg-fc">0</span> 层</div>
+        <div class="row"><span class="data-label">避难层层数：</span> <span class="data-value" id="bldg-rf">0</span> 层</div>
+        <div class="row"><span class="data-label">屋顶构筑物高度：</span> <span class="data-value" id="bldg-rsh">0.0</span> m</div>
         <div class="row"><span class="data-label">标准层面积：</span> <span class="data-value" id="bldg-ba">0</span> m²
         </div>
         <div class="row" style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-          <span style="font-weight:bold;">计容建筑面积：</span><span class="highlight"><span id="bldg-area">0.00</span>
-            m²</span>
+          <span style="font-weight:bold;" id="bldg-area-label">计容建筑面积：</span><span class="highlight"><span id="bldg-area">0.00</span> m²</span>
+        </div>
+        <div class="row" id="bldg-reduced-row" style="display:none;">
+          <span style="font-weight:bold;">计容建筑面积（折减后）：</span><span class="highlight" style="color:#ff9800;"><span id="bldg-reduced-area">0.00</span> m²</span>
         </div>
       </div>
     </div>
@@ -415,13 +422,18 @@
             <th style="text-align:left;">编号</th>
             <th>功能</th>
             <th style="text-align:right;">计容建筑面积(m²)</th>
+            <th id="bldg-multi-reduced-th" style="text-align:right; display:none;">折减后(m²)</th>
           </tr>
         </thead>
         <tbody id="bldg-list"></tbody>
       </table>
       <div class="row" style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
-        <span style="font-weight:bold; font-size:14px;">总计容建筑面积：</span>
+        <span style="font-weight:bold; font-size:14px;" id="bldg-total-label">总计容建筑面积：</span>
         <span class="highlight" style="color: #28a745;"><span id="bldg-total">0.00</span> m²</span>
+      </div>
+      <div class="row" id="bldg-reduced-total-row" style="display:none;">
+        <span style="font-weight:bold; font-size:14px;">总计容建筑面积（折减后）：</span>
+        <span class="highlight" style="color: #ff9800;"><span id="bldg-reduced-total">0.00</span> m²</span>
       </div>
     </div>
   </div>
@@ -436,7 +448,11 @@
     <!-- BP Group Readonly View -->
     <div id="site-bp-group" class="view-box">
       <div class="card">
-        <div class="title" style="border-left-color: #2e7d32;">BP组概览 <span class="bp-tag">只读预览</span></div>
+        <div class="title" style="border-left-color: #2e7d32; display:flex; align-items:center; justify-content:space-between;">
+          <span>BP组概览 <span class="bp-tag">只读预览</span></span>
+          <button id="btn-bp-show-number" class="toolbar-btn" style="padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleBpSiteNumber()">显示编号</button>
+        </div>
+        <span id="bp-site-id" style="display:none;"></span>
         <div class="readonly-grid">
           <div class="readonly-item">
             <span class="readonly-label">地块编号</span>
@@ -458,9 +474,17 @@
             <span class="readonly-label">总计容建面 (m²)</span>
             <span class="readonly-value" id="bp-gfa" style="color:#2e7d32;">0.00</span>
           </div>
+          <div class="readonly-item" id="bp-reduced-gfa-item" style="display:none;">
+            <span class="readonly-label">计容建面（折减后）(m²)</span>
+            <span class="readonly-value" id="bp-reduced-gfa" style="color:#ff9800;">0.00</span>
+          </div>
           <div class="readonly-item">
             <span class="readonly-label">容积率 (FAR)</span>
             <span class="readonly-value" id="bp-far">0.00</span>
+          </div>
+          <div class="readonly-item" id="bp-reduced-far-item" style="display:none;">
+            <span class="readonly-label">容积率（折减后）</span>
+            <span class="readonly-value" id="bp-reduced-far" style="color:#ff9800;">0.00</span>
           </div>
           <div class="readonly-item">
             <span class="readonly-label">地块限高 (m)</span>
@@ -485,18 +509,22 @@
       <div class="card">
         <div class="title" style="border-left-color: #28a745;">地块信息 <span class="id-badge" style="background:#28a745;"
             id="site-id">ID: --</span></div>
-        <div class="row"><span class="data-label">编号：</span><input type="text" id="site-no" placeholder="如 A-01"
-            onchange="updateSite()"></div>
+        <div class="row"><span class="data-label">编号：</span>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button id="btn-show-number" class="toolbar-btn" style="padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleSiteNumber(null, this)">显示编号</button>
+            <input type="text" id="site-no" placeholder="如 A-01" onchange="updateSite()">
+          </div>
+        </div>
         <div class="row"><span class="data-label">大类：</span><select id="site-t" onchange="updateSite()"></select>
         </div>
         <div class="row"><span class="data-label">用地性质：</span><select id="site-f" onchange="updateSite()"></select>
         </div>
         <div class="row"><span class="data-label">地块限高(m)：</span>
-          <div style="display:flex; gap:4px; align-items: stretch;">
-            <input type="number" id="site-hl" step="1.0" onchange="updateSite()" style="width: 55px; height: 26px;">
+          <div style="display:flex; gap:6px; align-items:center;">
             <button id="btn-hl-check" class="toolbar-btn"
               style="padding: 0 6px; font-size: 11px; margin:0; line-height: 24px; min-width: 80px;"
               onclick="toggleHeightCheck()">📏 开启检测</button>
+            <input type="number" id="site-hl" step="1.0" onchange="updateSite()">
           </div>
         </div>
       </div>
@@ -507,8 +535,10 @@
               id="site-area">0.00</span> m²</span>
         </div>
         <div class="row" style="margin-top:10px;">
-          <span style="font-weight:bold;">容积率：</span><span class="highlight" style="color: #28a745;"><span
-              id="site-far">0.00</span></span>
+          <span style="font-weight:bold;" id="site-far-label">容积率：</span><span class="highlight" style="color: #28a745;"><span id="site-far">0.00</span></span>
+        </div>
+        <div class="row" id="site-reduced-far-row" style="display:none;">
+          <span style="font-weight:bold;">容积率（折减后）：</span><span class="highlight" style="color: #ff9800;"><span id="site-reduced-far">0.00</span></span>
         </div>
         <div class="row" style="margin-top:10px;">
           <span style="font-weight:bold;">建筑密度：</span><span class="highlight" style="color: #28a745;"><span
@@ -540,14 +570,17 @@
                 <div class="filter-dropdown" id="filter-func-dropdown" style="display:none;"></div>
               </th>
               <th style="text-align:right;">计容建筑面积(m²)</th>
+              <th id="site-bldgs-reduced-th" style="text-align:right; display:none;">折减后(m²)</th>
             </tr>
           </thead>
           <tbody id="site-bldgs-list"></tbody>
           <tfoot>
             <tr>
-              <th colspan="3" style="text-align:left; border-top: 2px solid #ddd; padding-top: 5px;">合计总计容建筑面积(m²)</th>
+              <th colspan="3" style="text-align:left; border-top: 2px solid #ddd; padding-top: 5px;" id="site-bldgs-total-label">合计总计容建筑面积(m²)</th>
               <th id="site-bldgs-total"
                 style="text-align:right; border-top: 2px solid #ddd; padding-top: 5px; color:#ffc107;">0.00</th>
+              <th id="site-bldgs-reduced-total"
+                style="text-align:right; border-top: 2px solid #ddd; padding-top: 5px; color:#ff9800; display:none;">0.00</th>
             </tr>
           </tfoot>
         </table>
@@ -560,12 +593,14 @@
         <thead>
           <tr>
             <th style="text-align:left;">编号</th>
-            <th>性质</th>
+            <th style="text-align:left;">性质</th>
             <th style="text-align:right;">面积</th>
             <th style="text-align:right;">计容</th>
+            <th id="site-multi-reduced-gfa-th" style="text-align:right; display:none;">折减后计容</th>
             <th style="text-align:right;">容积率</th>
             <th style="text-align:right;">密度</th>
             <th style="text-align:right;">绿地率</th>
+            <th style="text-align:center;">显示</th>
           </tr>
         </thead>
         <tbody id="site-list"></tbody>
@@ -648,7 +683,9 @@
         document.getElementById('site-bldgs-card').style.display = 'none';
         return;
       }
-      
+
+      var hasReduced = currentBldgsData[0].reduced_area != null;
+
       // 筛选建筑
       let filteredBldgs = currentBldgsData;
       if (activeFilters.type !== '全部') {
@@ -657,23 +694,36 @@
       if (activeFilters.func !== '全部') {
         filteredBldgs = filteredBldgs.filter(b => b.f === activeFilters.func);
       }
-      
+
+      // 显示/隐藏折减列
+      document.getElementById('site-bldgs-reduced-th').style.display = hasReduced ? '' : 'none';
+      document.getElementById('site-bldgs-reduced-total').style.display = hasReduced ? '' : 'none';
+      document.getElementById('site-bldgs-total-label').innerText = '合计总计容建筑面积(m²)';
+
       // 渲染列表
       let bHtml = "";
       let tArea = 0;
+      let tReducedArea = 0;
       filteredBldgs.forEach(b => {
         let dNo = b.no ? b.no : "<span style='color:#aaa;'>无编号</span>";
         bHtml += `<tr>
           <td style="text-align:left; color:#17a2b8;">${dNo}</td>
           <td>${b.type}</td>
           <td>${b.f}</td>
-          <td style="text-align:right; font-weight:bold;">${b.area}</td>
-        </tr>`;
+          <td style="text-align:right; font-weight:bold;">${b.area}</td>`;
+        if (hasReduced) {
+          bHtml += `<td style="text-align:right; color:#ff9800; font-weight:bold;">${parseFloat(b.reduced_area || 0).toFixed(2)}</td>`;
+        }
+        bHtml += `</tr>`;
         tArea += parseFloat(b.area || 0);
+        tReducedArea += parseFloat(b.reduced_area || 0);
       });
-      
+
       document.getElementById('site-bldgs-list').innerHTML = bHtml;
       document.getElementById('site-bldgs-total').innerText = tArea.toFixed(2);
+      if (hasReduced) {
+        document.getElementById('site-bldgs-reduced-total').innerText = tReducedArea.toFixed(2);
+      }
       document.getElementById('site-bldgs-card').style.display = 'block';
     }
     
@@ -762,6 +812,31 @@
       let idStr = document.getElementById('site-id').innerText.replace("ID: ", "").trim();
       sketchup.toggle_height_check(idStr);
     }
+    function toggleSiteNumber(idStr, btnElement) {
+      if (!idStr) {
+        idStr = document.getElementById('site-id').innerText.replace("ID: ", "").trim();
+      }
+      // 即时切换按钮状态，无需等待 Ruby 回调刷新
+      let btn = btnElement || document.getElementById('btn-show-number');
+      if (btn) {
+        let showing = btn.innerText === '隐藏编号';
+        btn.innerText = showing ? '显示编号' : '隐藏编号';
+        if (showing) btn.classList.remove('active'); else btn.classList.add('active');
+      }
+      sketchup.toggle_site_number(idStr);
+    }
+    function toggleBpSiteNumber() {
+      let idStr = document.getElementById('bp-site-id').innerText.trim();
+      if (!idStr) return;
+      // 即时切换按钮状态
+      let btn = document.getElementById('btn-bp-show-number');
+      if (btn) {
+        let showing = btn.innerText === '隐藏编号';
+        btn.innerText = showing ? '显示编号' : '隐藏编号';
+        if (showing) btn.classList.remove('active'); else btn.classList.add('active');
+      }
+      sketchup.toggle_site_number(idStr);
+    }
     function showBanner(type, msg) {
       let banner = document.getElementById('banner');
       banner.className = 'banner ' + (type || 'info');
@@ -808,8 +883,34 @@
             document.getElementById('bldg-type').value = data.type || "塔楼";
             document.getElementById('bldg-f').innerHTML = buildOptions(funcs, data.f || funcs[0]);
             document.getElementById('bldg-th').value = data.th || "0";
+            // 根据建筑类型动态修改总高度标签
+            var thLabel = document.getElementById('bldg-th-label');
+            var heRow = document.getElementById('bldg-he-row');
+            if (data.type === '塔楼') {
+              thLabel.innerText = '塔楼建筑高度(m)：';
+              heRow.style.display = 'flex';
+              document.getElementById('bldg-he').innerText = parseFloat(data.he || data.th || 0).toFixed(2);
+            } else if (data.type === '裙楼') {
+              thLabel.innerText = '裙楼建筑高度(m)：';
+              heRow.style.display = 'none';
+            } else {
+              thLabel.innerText = '总高度(m)：';
+              heRow.style.display = 'none';
+            }
             document.getElementById('bldg-fc').innerText = data.fc || "0";
+            document.getElementById('bldg-rf').innerText = data.rf || "0";
+            document.getElementById('bldg-rsh').innerText = parseFloat(data.rsh || 0).toFixed(1);
             document.getElementById('bldg-ba').innerText = data.ba || "0";
+
+            // 折减开关
+            if (data.reduction_enabled) {
+              document.getElementById('bldg-area-label').innerText = '计容建筑面积（不折减）：';
+              document.getElementById('bldg-reduced-row').style.display = 'flex';
+              document.getElementById('bldg-reduced-area').innerText = parseFloat(data.reduced_area || 0).toFixed(2);
+            } else {
+              document.getElementById('bldg-area-label').innerText = '计容建筑面积：';
+              document.getElementById('bldg-reduced-row').style.display = 'none';
+            }
           } else {
             let tEl = document.getElementById('site-t');
             if (tEl) tEl.innerHTML = buildOptions(types, data.t);
@@ -827,19 +928,41 @@
               }
             }
 
+            // Update show-number button state
+            let numBtn = document.getElementById('btn-show-number');
+            if (numBtn) {
+              if (data.is_showing_number) {
+                numBtn.innerText = "隐藏编号";
+                numBtn.classList.add('active');
+              } else {
+                numBtn.innerText = "显示编号";
+                numBtn.classList.remove('active');
+              }
+            }
+
+            // 折减开关 — site BIM
+            if (data.reduction_enabled) {
+              document.getElementById('site-far-label').innerText = '容积率（不折减）：';
+              document.getElementById('site-reduced-far-row').style.display = 'flex';
+              document.getElementById('site-reduced-far').innerText = parseFloat(data.reduced_far || 0).toFixed(2);
+            } else {
+              document.getElementById('site-far-label').innerText = '容积率：';
+              document.getElementById('site-reduced-far-row').style.display = 'none';
+            }
+
             if (data.bldgs && data.bldgs.length > 0) {
               // 保存建筑数据和可用功能列表（使用建筑功能，而非地块用地性质）
               currentBldgsData = data.bldgs;
               availableFuncs = data.bldg_funcs || [];  // 使用建筑功能列表
-              
+
               // 重置筛选状态
               activeFilters = { type: '全部', func: '全部' };
               document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-              
+
               // 清空功能筛选下拉菜单（下次打开时重新生成）
               const funcDropdown = document.getElementById('filter-func-dropdown');
               if (funcDropdown) funcDropdown.innerHTML = '';
-              
+
               // 渲染建筑列表
               renderBldgsList();
 
@@ -866,6 +989,7 @@
           }
 
           document.getElementById('bp-no').innerText = data.no || "-";
+          document.getElementById('bp-site-id').innerText = data.id || "";
           document.getElementById('bp-t').innerText = data.t || "-";
           document.getElementById('bp-f').innerText = data.f || "-";
           document.getElementById('bp-area').innerText = parseFloat(data.area || 0).toFixed(2);
@@ -876,6 +1000,29 @@
           document.getElementById('bp-density').innerText = (data.density || 0).toFixed(1) + "%";
           document.getElementById('bp-green-rate').innerText = (data.green_rate || 0).toFixed(1);
           document.getElementById('bp-green-m2').innerText = (data.green_m2 || 0).toFixed(2);
+
+          // 折减开关 — BP group
+          if (data.reduction_enabled) {
+            document.getElementById('bp-reduced-gfa-item').style.display = '';
+            document.getElementById('bp-reduced-far-item').style.display = '';
+            document.getElementById('bp-reduced-gfa').innerText = parseFloat(data.reduced_gfa || 0).toFixed(2);
+            document.getElementById('bp-reduced-far').innerText = parseFloat(data.reduced_far || 0).toFixed(2);
+          } else {
+            document.getElementById('bp-reduced-gfa-item').style.display = 'none';
+            document.getElementById('bp-reduced-far-item').style.display = 'none';
+          }
+
+          // Sync BP show-number button
+          let bpNumBtn = document.getElementById('btn-bp-show-number');
+          if (bpNumBtn) {
+            if (data.is_showing_number) {
+              bpNumBtn.innerText = "隐藏编号";
+              bpNumBtn.classList.add('active');
+            } else {
+              bpNumBtn.innerText = "显示编号";
+              bpNumBtn.classList.remove('active');
+            }
+          }
         }
 
 
@@ -889,16 +1036,24 @@
               let displayNo = item.no ? item.no : "<span style='color:#aaa;'>无</span>";
               let label = type === 'bldg' ? item.f : item.t;
               if (type === 'bldg') {
-                listHtml += `<tr><td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td><td>${label}</td><td style="text-align:right; font-weight:bold;">${item.area}</td></tr>`;
+                listHtml += `<tr><td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td><td>${label}</td><td style="text-align:right; font-weight:bold;">${item.area}</td>`;
+                if (data.reduction_enabled) {
+                  listHtml += `<td style="text-align:right; color:#ff9800; font-weight:bold;">${parseFloat(item.reduced_area || 0).toFixed(2)}</td>`;
+                }
+                listHtml += `</tr>`;
               } else {
                 listHtml += `<tr>
                   <td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td>
                   <td style="font-size:10px;">${label}</td>
                   <td style="text-align:right;">${item.area}</td>
-                  <td style="text-align:right; color:#28a745; font-weight:bold;">${item.gfa}</td>
-                  <td style="text-align:right;">${item.far}</td>
+                  <td style="text-align:right; color:#28a745; font-weight:bold;">${item.gfa}</td>`;
+                if (data.reduction_enabled) {
+                  listHtml += `<td style="text-align:right; color:#ff9800; font-weight:bold;">-</td>`;
+                }
+                listHtml += `<td style="text-align:right;">${item.far}</td>
                   <td style="text-align:right;">${item.density}%</td>
                   <td style="text-align:right; color:#388e3c;">${item.green_rate}%</td>
+                  <td style="text-align:center;"><button class="toolbar-btn" style="padding:0 6px; font-size:10px;" onclick="toggleSiteNumber('${item.id}', this)">${item.is_showing_number ? '隐藏' : '显示'}</button></td>
                 </tr>`;
               }
             });
@@ -907,6 +1062,29 @@
           if (lEl) lEl.innerHTML = listHtml;
           let tAreaEl = document.getElementById(`${type}-total`);
           if (tAreaEl) tAreaEl.innerText = parseFloat(data.totalArea || 0).toFixed(2);
+
+          // 多选折减显示
+          if (type === 'bldg') {
+            var multiReducedTh = document.getElementById('bldg-multi-reduced-th');
+            var reducedTotalRow = document.getElementById('bldg-reduced-total-row');
+            var totalLabel = document.getElementById('bldg-total-label');
+            if (data.reduction_enabled) {
+              if (multiReducedTh) multiReducedTh.style.display = '';
+              if (reducedTotalRow) reducedTotalRow.style.display = 'flex';
+              if (totalLabel) totalLabel.innerText = '总计容建筑面积（不折减）：';
+              var reducedTotalEl = document.getElementById('bldg-reduced-total');
+              if (reducedTotalEl) reducedTotalEl.innerText = parseFloat(data.reducedTotalArea || 0).toFixed(2);
+            } else {
+              if (multiReducedTh) multiReducedTh.style.display = 'none';
+              if (reducedTotalRow) reducedTotalRow.style.display = 'none';
+              if (totalLabel) totalLabel.innerText = '总计容建筑面积：';
+            }
+          } else if (type === 'site') {
+            var siteMultiReducedTh = document.getElementById('site-multi-reduced-gfa-th');
+            if (siteMultiReducedTh) {
+              siteMultiReducedTh.style.display = data.reduction_enabled ? '' : 'none';
+            }
+          }
         }
       } catch (e) {
         console.error("UI Refresh Error:", e);

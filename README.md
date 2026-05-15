@@ -4,7 +4,7 @@
 
 **专为城市规划师设计的 SketchUp 体块管理插件**
 
-[![Version](https://img.shields.io/badge/version-0.1.4--beta-blue.svg)](https://github.com/MaxExcelsior/su_civiscope_layout)
+[![Version](https://img.shields.io/badge/version-0.1.5--beta-blue.svg)](https://github.com/MaxExcelsior/su_civiscope_layout)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![SketchUp](https://img.shields.io/badge/SketchUp-2024+-orange.svg)](https://www.sketchup.com/)
 
@@ -249,15 +249,20 @@ CiviscopeLayout::Logger.info("调试信息")
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解版本更新历史。
 
-### 最新版本：v0.1.4-beta (2026-04-09)
+### 最新版本：v0.1.5-beta (2026-05-14)
 
 **新增功能：**
-- ✨ 右键菜单功能 - 重建用地红线
-- ✨ 边线组提取和变换处理
+- ✨ 绘制建筑退线工具 — 支持多层退线生成、边导航对话框、临水/临绿快捷输入
+- ✨ 计容面积折减系数 — 裙楼/塔楼按高度区间分段折减，统计面板全视图支持
+- ✨ 建筑基底填充工具 — 材质面积法计算建筑密度，与绿地率算法统一
+- ✨ 地块编号叠加层显示
 
 **优化改进：**
-- 🔧 限高盒渲染优化
-- 🔧 边线组坐标变换处理
+- 🔧 Scale 工具修改后指标实时刷新（onTransactionCommit）
+- 🔧 屋顶构筑物跨 100m 阈值时面丢失/卡顿修复
+- 🔧 撤销操作修复（透明 undo operation 包裹）
+- 🔧 建筑密度算法由多边形去重改为材质面积法
+- 🔧 分层线群组统一归入 `000-分层线` SU图层
 
 ---
 
@@ -291,30 +296,28 @@ SOFTWARE.
 
 ---
 
-## 👨‍💻 作者
-
-**MaxExcelsior**
-
-- 📧 微信：见插件"关于"页面
-- 💰 打赏：欢迎支持开发者持续维护
-
----
-
-## 🙏 致谢
-
-感谢所有为这个项目做出贡献的开发者和用户！
-
-特别感谢：
-- [SketchUp](https://www.sketchup.com/) 提供强大的 3D 建模平台
-- 所有提出建议和反馈的用户
-
----
-
 ## 📮 联系方式
 
-- **问题反馈**：[GitHub Issues](https://github.com/MaxExcelsior/su_civiscope_layout/issues)
-- **功能建议**：[GitHub Discussions](https://github.com/MaxExcelsior/su_civiscope_layout/discussions)
-- **个人微信**：通过插件"关于"页面查看
+<div align="center">
+
+***联系作者：MaxExcelsior***
+
+<img src="assets/个人微信.png" width="300" style="margin-bottom: 50px;">
+
+***公众号：城析万相 Civiscope***
+
+<img src="assets/公众号二维码.jpg" width="300" style="margin-bottom: 50px;">
+
+***小红书：城析万相***
+
+<img src="assets/城析万相小红书二维码.png" width="300" style="margin-bottom: 50px;">
+
+***请我喝杯咖啡***
+
+<img src="assets/个人收款码.jpg" width="300" style="margin-bottom: 50px;">
+
+</div>
+
 
 ---
 

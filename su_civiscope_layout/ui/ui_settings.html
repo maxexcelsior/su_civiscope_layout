@@ -57,6 +57,8 @@
     <div class="nav-item active" onclick="switchTab('tab-building')">建筑配置</div>
     <div class="nav-item" onclick="switchTab('tab-site')">用地配置</div>
     <div class="nav-item" onclick="switchTab('tab-gui')">界面设置</div>
+    <div class="nav-item" onclick="switchTab('tab-overlay')">编号设置</div>
+    <div class="nav-item" onclick="switchTab('tab-stats-cfg')">统计配置</div>
   </div>
   <div class="content">
     <div id="tab-building" class="tab-content active">
@@ -90,6 +92,67 @@
           <input type="number" id="gui-stats-h" style="width:70px; padding:5px; border:1px solid #ccc; border-radius:4px;" onchange="saveGui()">
         </div>
         <p style="font-size:11px; color:#888;">* 您也可以直接在统计中心窗口边缘进行拉伸，尺寸会自动同步到此处。</p>
+      </div>
+    </div>
+
+    <div id="tab-stats-cfg" class="tab-content">
+      <h3 style="border-bottom-color: #ff9800;">计容面积折减设置</h3>
+
+      <div class="card-simple" style="padding:15px; background:#f9f9f9; border-radius:8px; margin-bottom:20px;">
+        <label style="font-size:13px; color:#555; display:flex; align-items:center; gap:10px; cursor:pointer;">
+          <input type="checkbox" id="reduction-enabled" onchange="onReductionEnabledChange()">
+          <strong>启用折减</strong>
+          <span style="font-size:11px; color:#999;">（开启后，统计面板计容建筑面积将按高度区间折减）</span>
+        </label>
+      </div>
+
+      <h4 style="font-size:13px; color:#0056b3; margin:15px 0 8px 0;">塔楼 / 独立 — 折减系数（按建筑真高）</h4>
+      <div class="card-simple" style="padding:10px; background:#f9f9f9; border-radius:8px; margin-bottom:15px;">
+        <table style="width:100%; font-size:12px; border-collapse:collapse;" id="tower-reduction-table">
+          <thead>
+            <tr style="color:#555;">
+              <th style="text-align:left; padding:4px;">高度区间 (m)</th>
+              <th style="text-align:right; padding:4px; width:80px;">折减系数</th>
+              <th style="width:30px;"></th>
+            </tr>
+          </thead>
+          <tbody id="tower-coeffs-body"></tbody>
+        </table>
+        <button class="cp-btn secondary" style="width:100%; margin-top:8px; font-size:11px;" onclick="addReductionRow('tower')">+ 追加区间</button>
+      </div>
+
+      <h4 style="font-size:13px; color:#28a745; margin:15px 0 8px 0;">裙楼 — 折减系数（按裙楼建筑高度）</h4>
+      <div class="card-simple" style="padding:10px; background:#f9f9f9; border-radius:8px;">
+        <table style="width:100%; font-size:12px; border-collapse:collapse;" id="podium-reduction-table">
+          <thead>
+            <tr style="color:#555;">
+              <th style="text-align:left; padding:4px;">高度区间 (m)</th>
+              <th style="text-align:right; padding:4px; width:80px;">折减系数</th>
+              <th style="width:30px;"></th>
+            </tr>
+          </thead>
+          <tbody id="podium-coeffs-body"></tbody>
+        </table>
+        <button class="cp-btn secondary" style="width:100%; margin-top:8px; font-size:11px;" onclick="addReductionRow('podium')">+ 追加区间</button>
+      </div>
+    </div>
+
+    <div id="tab-overlay" class="tab-content">
+      <h3 style="border-bottom-color: #ffc107;">地块编号显示参数</h3>
+      <div class="card-simple" style="padding:15px; background:#f9f9f9; border-radius:8px;">
+        <p style="font-size:11px; color:#888; margin:0 0 12px 0;">配置地块编号文字的高度，修改后需重新开启"显示编号"生效。</p>
+
+        <div style="margin-bottom:15px;">
+          <label style="font-size:12px; color:#555; display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <input type="checkbox" id="ol-use-hl" onchange="onUseHeightLimitChange(); saveOverlaySettings()">
+            根据地块限高标注（限高值 + 10m）
+          </label>
+        </div>
+
+        <div style="margin-bottom:15px;">
+          <label style="font-size:12px; color:#555; display:block; margin-bottom:4px;">离地高度 (m)</label>
+          <input type="number" id="ol-height" min="0.1" max="50" step="0.1" value="2.0" onchange="saveOverlaySettings()" style="width:100px; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:13px;">
+        </div>
       </div>
     </div>
   </div>
@@ -405,6 +468,117 @@
       let h = document.getElementById('gui-stats-h').value;
       sketchup.update_stats_size(w, h);
     }
+
+    // ========== 编号设置 ==========
+    function renderOverlaySettings(height, useHeightLimit) {
+      document.getElementById('ol-height').value = height;
+      document.getElementById('ol-use-hl').checked = useHeightLimit;
+      document.getElementById('ol-height').disabled = useHeightLimit;
+    }
+
+    function onUseHeightLimitChange() {
+      var checked = document.getElementById('ol-use-hl').checked;
+      document.getElementById('ol-height').disabled = checked;
+    }
+
+    function saveOverlaySettings() {
+      var height = document.getElementById('ol-height').value;
+      var useHl = document.getElementById('ol-use-hl').checked;
+      try { sketchup.save_overlay_settings(height, useHl); } catch(e) {}
+    }
+
+    // ========== 计容面积折减设置 ==========
+    let reductionData = { enabled: false, podium_reduction: [], tower_reduction: [] };
+
+    function renderReductionSettings(data) {
+      reductionData = data;
+      document.getElementById('reduction-enabled').checked = data.enabled;
+      renderReductionTable('tower', data.tower_reduction);
+      renderReductionTable('podium', data.podium_reduction);
+    }
+
+    function renderReductionTable(type, intervals) {
+      let tbody = document.getElementById(type + '-coeffs-body');
+      if (!intervals || intervals.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="color:#aaa; text-align:center; padding:8px;">暂无区间</td></tr>';
+        return;
+      }
+      let html = '';
+      let prevMax = 0;
+      intervals.forEach(function(entry, idx) {
+        let maxH = entry[0];
+        let coeff = entry[1];
+        let pct = (coeff * 100).toFixed(0);
+        let bracket = idx === 0 ? '[' : '(';
+        html += `<tr style="border-bottom:1px solid #eee;">
+          <td style="padding:4px;">
+            <span style="color:#888;">${bracket}${prevMax}, </span>
+            <span style="font-weight:bold;">${maxH}</span><span style="color:#888;">]</span>
+          </td>
+          <td style="text-align:right; padding:4px;">
+            <input type="number" value="${pct}" min="0" max="100" step="1" style="width:55px; padding:3px; border:1px solid #ccc; border-radius:3px; text-align:right;"
+              onchange="updateReductionInterval('${type}', ${idx}, 1, this.value / 100)">
+            <span style="color:#888;">%</span>
+          </td>
+          <td style="text-align:center;"><button class="btn-del" onclick="deleteReductionRow('${type}', ${idx})">×</button></td>
+        </tr>`;
+        prevMax = maxH;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function updateReductionInterval(type, idx, field, val) {
+      let numVal = parseFloat(val) || 0;
+      if (type === 'tower') {
+        reductionData.tower_reduction[idx][field] = numVal;
+      } else {
+        reductionData.podium_reduction[idx][field] = numVal;
+      }
+      // Re-render to update interval labels
+      renderReductionTable(type, type === 'tower' ? reductionData.tower_reduction : reductionData.podium_reduction);
+      saveReductionState();
+    }
+
+    function addReductionRow(type) {
+      let arr = type === 'tower' ? reductionData.tower_reduction : reductionData.podium_reduction;
+      let lastMax = arr.length > 0 ? arr[arr.length - 1][0] : 0;
+      let newMax = lastMax + (type === 'tower' ? 50 : 10);
+      let lastCoeff = arr.length > 0 ? arr[arr.length - 1][1] : 0.95;
+      arr.push([newMax, lastCoeff]);
+      renderReductionTable(type, arr);
+      saveReductionState();
+    }
+
+    function deleteReductionRow(type, idx) {
+      let arr = type === 'tower' ? reductionData.tower_reduction : reductionData.podium_reduction;
+      arr.splice(idx, 1);
+      renderReductionTable(type, arr);
+      saveReductionState();
+    }
+
+    function onReductionEnabledChange() {
+      reductionData.enabled = document.getElementById('reduction-enabled').checked;
+      saveReductionState();
+    }
+
+    function saveReductionState() {
+      try {
+        sketchup.save_reduction_settings(
+          reductionData.enabled,
+          JSON.stringify(reductionData.podium_reduction),
+          JSON.stringify(reductionData.tower_reduction)
+        );
+      } catch(e) {}
+    }
+
+    // Trigger stats-cfg tab load when switching to it
+    var origSwitchTab2 = switchTab;
+    switchTab = function(tabId) {
+      origSwitchTab2(tabId);
+      if (tabId === 'tab-stats-cfg') {
+        try { sketchup.load_reduction_settings(); } catch(e) {}
+      }
+    };
   </script>
 </body>
 </html>

@@ -212,7 +212,9 @@ module CiviscopeLayout
           if @temp_text_entities
             edges_data.each_with_index do |ed, i|
               next unless @temp_text_entities[i] && @temp_text_entities[i].valid?
-              text = if ed["isWater"]
+              text = if ed["isAdjacentLand"]
+                       "相邻用地"
+                     elsif ed["isWater"]
                        "⛵水"
                      elsif ed["isGreen"]
                        "🌳绿#{ed["greenWidth"]}"
@@ -250,7 +252,10 @@ module CiviscopeLayout
 
           # 将结构化边数据转换为距离哈希
           edge_distances_m = data["edges"].map do |ed|
-            if ed["isWater"]
+            if ed["isAdjacentLand"]
+              # 相邻用地：固定退线距离 7.2/12/12
+              BuildingSetback.get_adjacent_land_setback
+            elsif ed["isWater"]
               # 相邻水域：使用固定退线距离
               BuildingSetback.get_water_green_setback(bldg_type)
             elsif ed["isGreen"]

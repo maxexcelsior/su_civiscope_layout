@@ -191,12 +191,26 @@ module CiviscopeLayout
       model = Sketchup.active_model
       mat_name = "Civiscope_内部绿地"
       mat = model.materials[mat_name]
-      
+
       unless mat
         mat = model.materials.add(mat_name)
         mat.color = "#bee599"
       end
-      
+
+      model.materials.current = mat
+      Sketchup.send_action("selectPaintTool:")
+    end
+
+    def self.do_activate_base_tool
+      model = Sketchup.active_model
+      mat_name = "Civiscope_建筑基底"
+      mat = model.materials[mat_name]
+
+      unless mat
+        mat = model.materials.add(mat_name)
+        mat.color = "#9e9e9e"
+      end
+
       model.materials.current = mat
       Sketchup.send_action("selectPaintTool:")
     end

@@ -99,6 +99,83 @@ module CiviscopeLayout
     end
 
     # ==========================================
+    # 计容面积折减设置
+    # ==========================================
+    DEFAULT_PODIUM_REDUCTION = [
+      [12, 0.95],
+      [24, 0.90],
+      [30, 0.85],
+      [40, 0.80]
+    ].freeze
+
+    DEFAULT_TOWER_REDUCTION = [
+      [100, 0.95],
+      [150, 0.92],
+      [200, 0.89],
+      [250, 0.86],
+      [300, 0.83],
+      [350, 0.79],
+      [400, 0.76],
+      [450, 0.73],
+      [500, 0.70]
+    ].freeze
+
+    def self.get_reduction_settings
+      config = self.load_config
+      {
+        "enabled" => config["reduction_enabled"] || false,
+        "podium_reduction" => config["podium_reduction"] || DEFAULT_PODIUM_REDUCTION,
+        "tower_reduction" => config["tower_reduction"] || DEFAULT_TOWER_REDUCTION
+      }
+    end
+
+    def self.save_reduction_settings(enabled, podium_arr, tower_arr)
+      config = self.load_config
+      config["reduction_enabled"] = enabled ? true : false
+      config["podium_reduction"] = podium_arr
+      config["tower_reduction"] = tower_arr
+      self.save_config(config)
+    end
+
+    # 根据建筑类型和高度查找折减系数
+    def self.compute_reduction_factor(bldg_type, height_m)
+      settings = self.get_reduction_settings
+      return 1.0 unless settings['enabled']
+
+      intervals = case bldg_type
+      when '裙楼' then settings['podium_reduction']
+      when '塔楼', '独立' then settings['tower_reduction']
+      else return 1.0
+      end
+
+      return 1.0 if intervals.nil? || intervals.empty?
+
+      intervals.each do |entry|
+        max_h = entry[0].to_f
+        coeff = entry[1].to_f
+        return coeff if height_m <= max_h
+      end
+
+      1.0  # 超出所有区间则不折减
+    end
+
+    # 编号设置（地块编号显示参数）
+    def self.get_overlay_number_settings
+      config = self.load_config
+      {
+        "height" => config["overlay_number_height"] || 2.0,
+        "use_height_limit" => config["overlay_use_height_limit"] || false
+      }
+    end
+
+    def self.save_overlay_number_settings(height, use_height_limit)
+      config = self.load_config
+      config["overlay_number_height"] = height.to_f
+      config["overlay_use_height_limit"] = use_height_limit ? true : false
+      self.save_config(config)
+    end
+
+    # ==========================================
     # UI 弹窗与交互逻辑
     # ==========================================
     def self.show_settings_dialog
@@ -106,8 +183,8 @@ module CiviscopeLayout
         @dialog_settings.bring_to_front; return
       end
       
-      @dialog_settings = UI::HtmlDialog.new({:dialog_title=>"插件设置", :width=>460, :height=>600, :style=>UI::HtmlDialog::STYLE_DIALOG})
-      self.center_dialog(@dialog_settings, 460, 600)
+      @dialog_settings = UI::HtmlDialog.new({:dialog_title=>"插件设置", :width=>460, :height=>640, :style=>UI::HtmlDialog::STYLE_DIALOG})
+      self.center_dialog(@dialog_settings, 460, 640)
       @dialog_settings.set_file(File.join(__dir__, 'ui', 'ui_settings.html'))
       
       @dialog_settings.add_action_callback("ready") { self.refresh_settings_ui }
@@ -161,22 +238,43 @@ module CiviscopeLayout
         end
       end
 
+      @dialog_settings.add_action_callback("load_overlay_settings") do
+        settings = self.get_overlay_number_settings
+        @dialog_settings.execute_script("renderOverlaySettings(#{settings['height'].to_f}, #{settings['use_height_limit']})")
+      end
+
+      @dialog_settings.add_action_callback("save_overlay_settings") do |_, height, use_height_limit|
+        self.save_overlay_number_settings(height, use_height_limit)
+      end
+
+      @dialog_settings.add_action_callback("load_reduction_settings") do
+        rs = self.get_reduction_settings
+        @dialog_settings.execute_script("renderReductionSettings(#{rs.to_json})")
+      end
+
+      @dialog_settings.add_action_callback("save_reduction_settings") do |_, enabled, podium_json, tower_json|
+        podium_arr = JSON.parse(podium_json)
+        tower_arr = JSON.parse(tower_json)
+        self.save_reduction_settings(enabled, podium_arr, tower_arr)
+      end
+
       @dialog_settings.set_on_closed { @dialog_settings = nil }
       @dialog_settings.show
     end
 
     def self.refresh_settings_ui
       return unless @dialog_settings
-      
+
       data = {
         bldg: { defs: DEFAULT_BLDG_FUNCS, cust: self.get_custom_funcs('bldg') },
         site: { defs: DEFAULT_SITE_FUNCS, cust: self.get_custom_funcs('site') },
         types: SITE_TYPES,
         colors: self.get_custom_colors,
         fallback_colors: COLOR_MAP,
-        stats_size: self.get_stats_size
+        stats_size: self.get_stats_size,
+        overlay_height: self.get_overlay_number_settings["height"]
       }
-      
+
       @dialog_settings.execute_script("renderLists(#{data.to_json})")
     end
 

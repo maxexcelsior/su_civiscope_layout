@@ -12,8 +12,9 @@ module CiviscopeLayout
       self.center_dialog(@dialog_stats, w, h)
       @dialog_stats.set_file(File.join(__dir__, 'ui_stats.html'))
       
-      # Ensure overlay is registered
+      # Ensure overlays are registered
       self.ensure_height_check_overlay(Sketchup.active_model)
+      self.ensure_site_number_overlay(Sketchup.active_model)
       
       @dialog_stats.add_action_callback("on_tab_changed") do |_, tab_id|
         @current_active_tab = tab_id
@@ -27,12 +28,14 @@ module CiviscopeLayout
       @dialog_stats.add_action_callback("convert_site") { self.do_convert_site }
       @dialog_stats.add_action_callback("apply_site") { |_, t, f, no, hl| self.do_apply_site(t, f, no, hl) }
       @dialog_stats.add_action_callback("toggle_height_check") { |_, id| self.do_toggle_height_check(id) }
+      @dialog_stats.add_action_callback("toggle_site_number") { |_, id| self.toggle_site_number(id) }
       @dialog_stats.add_action_callback("set_all_height_checks") { |_, status| self.do_set_all_height_checks(status) }
       @dialog_stats.add_action_callback("start_picker") { |_, mode| Sketchup.active_model.select_tool(FunctionPickerTool.new(mode)) }
       @dialog_stats.add_action_callback("show_picker_settings") { |_, type| self.show_picker_settings_dialog(type) }
       @dialog_stats.add_action_callback("export_data") { |_, mode| UI.messagebox((mode == 'bldg' ? "建筑" : "用地") + "导出表单功能开发中...") }
       @dialog_stats.add_action_callback("faces_to_sites") { self.do_faces_to_sites }
       @dialog_stats.add_action_callback("activate_greenery_tool") { self.do_activate_greenery_tool }
+      @dialog_stats.add_action_callback("activate_base_tool") { self.do_activate_base_tool }
       @dialog_stats.add_action_callback("ready") { self.refresh_stats_ui(Sketchup.active_model.selection) }
       @dialog_stats.add_action_callback("on_resized") { |_, w, h| self.save_stats_size(w.to_i, h.to_i) }
       @dialog_stats.set_on_closed { @dialog_stats = nil }
@@ -96,27 +99,52 @@ module CiviscopeLayout
         data = { id: self.get_short_id(t), no: t.get_attribute("dynamic_attributes", "#{type}_no") || "" }
 
         if type == 'bldg'
+          bldg_type = t.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+          own_th = t.get_attribute("dynamic_attributes", "total_height").to_f
+          h_effective = self.compute_effective_h(t, bldg_type, own_th)
+          area_val = t.get_attribute("dynamic_attributes", "bldg_area").to_f
+          reduction_enabled = self.get_reduction_settings['enabled']
+          factor = self.compute_reduction_factor(bldg_type, h_effective)
+          reduced_area = (area_val * factor).round(2)
           data.merge!({
             h: t.get_attribute("dynamic_attributes", "floor_height"),
             f: t.get_attribute("dynamic_attributes", "bldg_func"),
             th: t.get_attribute("dynamic_attributes", "total_height"),
+            he: h_effective.round(2).to_s,
             fc: t.get_attribute("dynamic_attributes", "floor_count"),
             ba: t.get_attribute("dynamic_attributes", "base_area"),
             area: t.get_attribute("dynamic_attributes", "bldg_area"),
-            type: t.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+            type: bldg_type,
+            rf: t.get_attribute("dynamic_attributes", "refuge_floors") || "0",
+            rsh: t.get_attribute("dynamic_attributes", "roof_structure_height") || "0",
+            reduced_area: reduction_enabled ? reduced_area.to_s : nil,
+            reduction_enabled: reduction_enabled
           })
           @dialog_stats.execute_script("refreshUI('bldg', '#{mode}', [], #{all_funcs.to_json}, #{data.to_json})")
         else
           bldg_ents = self.find_buildings_on_site(t)
           t_gfa, t_footprint, t_green = self.calculate_site_metrics(t, bldg_ents)
-          
+
           site_area = t.get_attribute("dynamic_attributes", "site_area").to_f
           site_area = site_area > 0 ? site_area : 0.001
-          
+
+          # 折减后 GFA
+          reduction_enabled = self.get_reduction_settings['enabled']
+          t_reduced_gfa = 0.0
+          bldg_ents.each do |b|
+            b_area = b.get_attribute("dynamic_attributes", "bldg_area").to_f
+            b_type = b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+            h_for_r = self.get_height_for_reduction(b)
+            factor = self.compute_reduction_factor(b_type, h_for_r)
+            t_reduced_gfa += (b_area * factor).round(2)
+          end
+          t_reduced_gfa = t_reduced_gfa.round(2)
+
           # 获取地块内所有建筑的实际功能列表（用于筛选）
           bldg_funcs = bldg_ents.map { |b| b.get_attribute("dynamic_attributes", "bldg_func") }.uniq.compact
-          
+
           has_global_hl = @overlay && !@overlay.sites_data.empty?
+          site_id = self.get_short_id(t)
           data.merge!({
             t: t.get_attribute("dynamic_attributes", "site_type"),
             f: t.get_attribute("dynamic_attributes", "site_func"),
@@ -129,8 +157,12 @@ module CiviscopeLayout
             density: ((t_footprint / site_area) * 100).round(1),
             green_m2: t_green.round(2),
             green_rate: ((t_green / site_area) * 100).round(1),
-            is_checking: (@overlay && @overlay.sites_data.key?(self.get_short_id(t))),
-            global_hl_on: has_global_hl
+            is_checking: (@overlay && @overlay.sites_data.key?(site_id)),
+            is_showing_number: self.site_number_visible?(site_id),
+            global_hl_on: has_global_hl,
+            reduced_gfa: reduction_enabled ? t_reduced_gfa : nil,
+            reduced_far: reduction_enabled ? (t_reduced_gfa / site_area).round(2) : nil,
+            reduction_enabled: reduction_enabled
           })
           @dialog_stats.execute_script("refreshUI('site', '#{mode}', #{SITE_TYPES.to_json}, #{all_funcs.to_json}, #{data.to_json})")
         end
@@ -138,16 +170,27 @@ module CiviscopeLayout
         # Multi-select mode
         list_data = []
         total_area = 0.0
+        reduction_enabled = self.get_reduction_settings['enabled']
+        reduced_total_area = 0.0
         valid_targets.each do |t|
           self.attach_observers(t)
           area_val = t.get_attribute("dynamic_attributes", "#{type}_area").to_f
           total_area += area_val
-          item = { 
-            id: self.get_short_id(t), 
+          reduced_area_val = nil
+          if type == 'bldg'
+            b_type = t.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+            h_for_r = self.get_height_for_reduction(t)
+            factor = self.compute_reduction_factor(b_type, h_for_r)
+            reduced_area_val = (area_val * factor).round(2)
+            reduced_total_area += reduced_area_val
+          end
+          item = {
+            id: self.get_short_id(t),
             no: t.get_attribute("dynamic_attributes", "#{type}_no") || "",
-            f: t.get_attribute("dynamic_attributes", "#{type}_func"), 
-            t: t.get_attribute("dynamic_attributes", "site_type") || "", 
-            area: area_val.round(2) 
+            f: t.get_attribute("dynamic_attributes", "#{type}_func"),
+            t: t.get_attribute("dynamic_attributes", "site_type") || "",
+            area: area_val.round(2),
+            reduced_area: reduced_area_val
           }
           if type == 'site'
             bldg_ents = self.find_buildings_on_site(t)
@@ -157,11 +200,13 @@ module CiviscopeLayout
             item[:far] = (t_gfa / site_area).round(2)
             item[:density] = ((t_footprint / site_area) * 100).round(1)
             item[:green_rate] = ((t_green / site_area) * 100).round(1)
+            item[:is_showing_number] = self.site_number_visible?(self.get_short_id(t))
           end
           list_data << item
         end
         has_global_hl = @overlay && !@overlay.sites_data.empty?
-        @dialog_stats.execute_script("refreshUI('#{type}', 'multi', [], [], { list: #{list_data.to_json}, totalArea: #{total_area}, global_hl_on: #{has_global_hl} })")
+        multi_reduction_enabled = type == 'bldg' ? reduction_enabled : false
+        @dialog_stats.execute_script("refreshUI('#{type}', 'multi', [], [], { list: #{list_data.to_json}, totalArea: #{total_area}, reducedTotalArea: #{multi_reduction_enabled ? reduced_total_area : 'null'}, reduction_enabled: #{multi_reduction_enabled}, global_hl_on: #{has_global_hl} })")
       end
     end
 

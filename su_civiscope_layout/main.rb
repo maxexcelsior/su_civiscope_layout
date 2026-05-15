@@ -9,7 +9,7 @@ module CiviscopeLayout
     # 0. 全局常量与配置中心
     # ==========================================
     PLUGIN_NAME = "Civiscope_Layout" unless defined?(PLUGIN_NAME)
-    VERSION = "0.1.4-beta" unless defined?(VERSION)
+    VERSION = "0.1.5-beta" unless defined?(VERSION)
     AUTHOR = "MaxExcelsior" unless defined?(AUTHOR)
     
     DEFAULT_BLDG_FUNCS = ["办公", "商业", "居住", "公服设施", "市政设施", "交通设施", "工业", "仓储"] unless defined?(DEFAULT_BLDG_FUNCS)
@@ -62,6 +62,7 @@ module CiviscopeLayout
     require_relative 'ui/setback_tool'
     require_relative 'ui/context_menu'
     require_relative 'render/height_overlay'
+    require_relative 'render/site_number_overlay'
     require_relative 'ui/stats_dialog'
 
     # ==========================================
@@ -73,6 +74,7 @@ module CiviscopeLayout
       remove_const(:DEFAULT_SITE_FUNCS) if defined?(DEFAULT_SITE_FUNCS)
       remove_const(:SITE_TYPES) if defined?(SITE_TYPES)
       remove_const(:COLOR_MAP) if defined?(COLOR_MAP)
+      remove_const(:MODIFICATION_TOOL_IDS) if defined?(MODIFICATION_TOOL_IDS)
       
       # 1. 清理现有观察者
       model = Sketchup.active_model
@@ -106,6 +108,7 @@ module CiviscopeLayout
       load File.join(__dir__, 'ui', 'setback_tool.rb')
       load File.join(__dir__, 'ui', 'context_menu.rb')
       load File.join(__dir__, 'render', 'height_overlay.rb')
+      load File.join(__dir__, 'render', 'site_number_overlay.rb')
       load File.join(__dir__, 'ui', 'stats_dialog.rb')
       
       # 7. 输出日志

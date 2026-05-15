@@ -8,6 +8,7 @@ module CiviscopeLayout
       @def_entities_observers = {}
       @selection_observer = nil
       @model_observer = nil
+      @tools_observer = nil
       
       # ==========================================
       # 清理所有观察者
@@ -33,6 +34,16 @@ module CiviscopeLayout
             puts "[Civiscope ObserverManager] 清理模型观察者失败: #{e.message}"
           end
           @model_observer = nil
+        end
+
+        # 清理工具观察者
+        if @tools_observer
+          begin
+            model.tools.remove_observer(@tools_observer)
+          rescue => e
+            puts "[Civiscope ObserverManager] 清理工具观察者失败: #{e.message}"
+          end
+          @tools_observer = nil
         end
         
         # 清理实体观察者
@@ -109,14 +120,34 @@ module CiviscopeLayout
       end
       
       # ==========================================
+      # 注册工具观察者
+      # ==========================================
+      def self.register_tools_observer(model)
+        return unless model
+
+        if @tools_observer
+          begin
+            model.tools.remove_observer(@tools_observer)
+          rescue
+          end
+        end
+
+        @tools_observer = CiviToolObserver.new
+        model.tools.add_observer(@tools_observer)
+
+        puts "[Civiscope ObserverManager] 工具观察者已注册"
+      end
+
+      # ==========================================
       # 注册所有核心观察者
       # ==========================================
       def self.register_all_observers(model)
         return unless model
-        
+
         self.register_selection_observer(model)
         self.register_model_observer(model)
-        
+        self.register_tools_observer(model)
+
         puts "[Civiscope ObserverManager] 核心观察者已全部注册"
       end
       
@@ -151,7 +182,8 @@ module CiviscopeLayout
           entity_observers: @entity_observers.keys.length,
           def_entities_observers: @def_entities_observers.keys.length,
           selection_observer: @selection_observer ? "已注册" : "未注册",
-          model_observer: @model_observer ? "已注册" : "未注册"
+          model_observer: @model_observer ? "已注册" : "未注册",
+          tools_observer: @tools_observer ? "已注册" : "未注册"
         }
       end
       
