@@ -63,38 +63,29 @@ module CiviscopeLayout
     end
 
     def self.schedule_auto_recalc(entity)
-      eid = get_short_id(entity) rescue '?'
-      puts "[DEBUG-FL] schedule_auto_recalc entity=#{eid} valid=#{entity.valid?} skip_recalc=#{CiviscopeLayout::Core.skip_recalc}"
       return unless entity.valid?
       return if CiviscopeLayout::Core.skip_recalc
 
       begin
         tool_id = Sketchup.active_model.tools.active_tool_id
-        tool_name = Sketchup.active_model.tools.active_tool_name rescue '?'
-        puts "[DEBUG-FL] schedule_auto_recalc tool=#{tool_name}(#{tool_id}) in_mod_list=#{MODIFICATION_TOOL_IDS.include?(tool_id)}"
         if MODIFICATION_TOOL_IDS.include?(tool_id)
           @pending_recalc_entity = entity
-          puts "[DEBUG-FL] schedule_auto_recalc DEFERRED — pending entity stored, safety timer 1.5s"
-          # 安全定时器：若 onTransactionCommit 未触发，1.5s 后强制 flush
           UI.stop_timer(@safety_timer_id) if @safety_timer_id
           @safety_timer_id = UI.start_timer(1.5, false) do
             @safety_timer_id = nil
-            puts "[DEBUG-FL] SAFETY-TIMER fired"
             self.flush_pending_recalc
           end
           return
         end
       rescue => ex
-        puts "[DEBUG-FL] schedule_auto_recalc tool detect ERROR: #{ex.message}"
+        # tool detection failed, fall through to normal path
       end
 
       @pending_recalc_entity = nil
       UI.stop_timer(@timer_id) if @timer_id
       UI.stop_timer(@safety_timer_id) if @safety_timer_id
-      puts "[DEBUG-FL] schedule_auto_recalc NORMAL timer 0.3s"
       @timer_id = UI.start_timer(0.3, false) do
         @timer_id = nil
-        puts "[DEBUG-FL] NORMAL-TIMER fired → auto_recalculate"
         self.auto_recalculate(entity)
       end
     end
@@ -102,17 +93,13 @@ module CiviscopeLayout
     def self.flush_pending_recalc
       entity = @pending_recalc_entity
       @pending_recalc_entity = nil
-      eid = get_short_id(entity) rescue 'nil'
       e_valid = entity && entity.valid? rescue false
-      puts "[DEBUG-FL] flush_pending_recalc entity=#{eid} valid=#{e_valid}"
       UI.stop_timer(@safety_timer_id) if @safety_timer_id
       @safety_timer_id = nil
       return unless e_valid
       UI.stop_timer(@timer_id) if @timer_id
-      puts "[DEBUG-FL] flush_pending_recalc starting 0.1s timer → auto_recalculate"
       @timer_id = UI.start_timer(0.1, false) do
         @timer_id = nil
-        puts "[DEBUG-FL] FLUSH-TIMER fired → auto_recalculate"
         self.auto_recalculate(entity)
       end
     end

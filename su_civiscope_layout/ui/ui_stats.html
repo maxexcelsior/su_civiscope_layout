@@ -9,6 +9,12 @@
       background-color: #f5f5f5;
       color: #1a1a1a;
       margin: 0;
+      min-width: 400px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    body::-webkit-scrollbar {
+      display: none;
     }
 
     .tabs {
@@ -315,6 +321,91 @@
       border-color: #388e3c !important;
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
     }
+    .rs-input {
+      width: 80px;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    .toggle-switch {
+      display: inline-flex;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      overflow: hidden;
+      font-size: 12px;
+      line-height: 24px;
+    }
+    .toggle-option {
+      padding: 0 10px;
+      cursor: pointer;
+      color: #666;
+      background: #fff;
+      transition: 0.2s;
+      user-select: none;
+    }
+    .toggle-option.active {
+      background: #0056b3;
+      color: #fff;
+    }
+    .rs-refresh-btn {
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      padding: 2px 8px;
+      line-height: 22px;
+      transition: 0.2s;
+      position: relative;
+    }
+    .rs-refresh-btn:hover {
+      background: #e8f5e9;
+      border-color: #4caf50;
+      color: #4caf50;
+    }
+    .rs-refresh-btn::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      transition-delay: 0.1s;
+      margin-bottom: 4px;
+    }
+    .rs-refresh-btn:hover::after {
+      opacity: 1;
+    }
+    .field-box {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      background: #fafafa;
+      white-space: nowrap;
+    }
+    .field-box input {
+      border: none !important;
+      background: #f9dcec !important;
+      outline: none;
+      padding: 0;
+      text-align: right;
+      width: 55px;
+    }
+    .field-box .data-value {
+      cursor: default;
+      user-select: none;
+    }
   </style>
 </head>
 
@@ -382,34 +473,93 @@
 
     <div id="bldg-bim" class="view-box">
       <div class="card">
-        <div class="title">建筑信息 <span class="id-badge" id="bldg-id">ID: --</span></div>
-        <div class="row"><span class="data-label">编号：</span><input type="text" id="bldg-no" placeholder="如 A-01"
-            onchange="updateBldg()"></div>
-        <div class="row"><span class="data-label">建筑层高(m)：</span><input type="number" id="bldg-h" step="0.1"
-            onchange="updateBldg()"></div>
-        <div class="row"><span class="data-label">建筑功能：</span><select id="bldg-f" onchange="updateBldg()"></select>
+        <div class="title">基本信息
+          <span style="display:flex; align-items:center; gap:6px;">
+            <button id="btn-bldg-show-number" class="toolbar-btn" style="padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleBldgNumber()">显示编号</button>
+            <span class="id-badge" id="bldg-id">ID: --</span>
+          </span>
         </div>
-        <div class="row"><span class="data-label">建筑类型：</span><select id="bldg-type" onchange="updateBldg()">
-            <option value="塔楼">塔楼</option>
-            <option value="裙楼">裙楼</option>
-            <option value="独立">独立</option>
-          </select></div>
+        <div class="row"><span class="data-label">建筑编号：</span><input type="text" id="bldg-no" placeholder="如 A-01"
+            onchange="updateBldg()" style="flex:1;"></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <div class="row" style="margin-bottom:0;"><span class="data-label">建筑功能：</span><select id="bldg-f" onchange="updateBldg()" style="flex:1; "></select></div>
+          <div class="row" style="margin-bottom:0;"><span class="data-label">建筑类型：</span><select id="bldg-type" onchange="updateBldg()" style="flex:1; ">
+              <option value="塔楼">塔楼</option>
+              <option value="裙楼">裙楼</option>
+              <option value="独立">独立</option>
+            </select></div>
+        </div>
       </div>
       <div class="card">
-        <div class="title">几何属性</div>
-        <div class="row"><span class="data-label" id="bldg-th-label">总高度(m)：</span> <input type="number" id="bldg-th" step="0.1"
-            onchange="updateBldg()" style="width: 80px;"></div>
-        <div class="row" id="bldg-he-row" style="display:none;"><span class="data-label">建筑真高（塔楼+裙楼）(m)：</span> <span class="data-value" id="bldg-he">0</span></div>
-        <div class="row"><span class="data-label">计容层数：</span> <span class="data-value" id="bldg-fc">0</span> 层</div>
-        <div class="row"><span class="data-label">避难层层数：</span> <span class="data-value" id="bldg-rf">0</span> 层</div>
-        <div class="row"><span class="data-label">屋顶构筑物高度：</span> <span class="data-value" id="bldg-rsh">0.0</span> m</div>
-        <div class="row"><span class="data-label">标准层面积：</span> <span class="data-value" id="bldg-ba">0</span> m²
+        <div class="title">建筑参数</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom:8px;">
+          <div class="field-box" style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+            <span class="data-label">建筑层高：</span>
+            <span style="display:flex; align-items:center; gap:2px;">
+              <input type="number" id="bldg-h" step="0.1" onchange="updateBldg()">
+              <span>米</span>
+            </span>
+          </div>
+          <div class="field-box" style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+            <span class="data-label" id="bldg-th-label">总高度：</span>
+            <span style="display:flex; align-items:center; gap:2px;">
+              <input type="number" id="bldg-th" step="0.1" onchange="updateBldg()">
+              <span>米</span>
+            </span>
+          </div>
         </div>
-        <div class="row" style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-          <span style="font-weight:bold;" id="bldg-area-label">计容建筑面积：</span><span class="highlight"><span id="bldg-area">0.00</span> m²</span>
+        <div class="row field-box" id="bldg-he-row" style="display:none;"><span class="data-label">建筑真高（塔楼+裙楼）：</span> <span><span class="data-value" id="bldg-he">0</span> 米</span></div>
+        <div id="roof-structure-section" style="margin-top:18px; border-top:1px solid #eee; padding-top:18px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom:12px; align-items:center;">
+            <div style="display:flex; align-items:center;">
+              <span class="data-label" style="margin-right:10px;">屋顶构筑物</span>
+              <button class="rs-refresh-btn" data-tooltip="刷新屋顶构筑物" onclick="refreshRoofStructure()">↻</button>
+            </div>
+            <div class="toggle-switch" id="rs-mode-toggle" style="width:100%;">
+              <span class="toggle-option active" data-value="auto" onclick="onToggleMode('auto')" style="flex:1;text-align:center;">自动</span>
+              <span class="toggle-option" data-value="manual" onclick="onToggleMode('manual')" style="flex:1;text-align:center;">手动</span>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom:12px;">
+            <div class="field-box" style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+              <span class="data-label">高度：</span>
+              <span style="display:flex; align-items:center; gap:2px;">
+                <span class="data-value" id="bldg-rsh">0.0</span>
+                <input type="number" id="bldg-rs-height" step="0.5" class="rs-input" style="display:none;" value="0">
+                <span>米</span>
+              </span>
+            </div>
+            <div class="field-box" style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+              <span class="data-label">缩进：</span>
+              <span style="display:flex; align-items:center; gap:2px;">
+                <span class="data-value" id="bldg-rsi">10.0</span>
+                <input type="number" id="bldg-rs-indent" step="0.5" class="rs-input" style="display:none;" value="10">
+                <span>米</span>
+              </span>
+            </div>
+          </div>
         </div>
-        <div class="row" id="bldg-reduced-row" style="display:none;">
-          <span style="font-weight:bold;">计容建筑面积（折减后）：</span><span class="highlight" style="color:#ff9800;"><span id="bldg-reduced-area">0.00</span> m²</span>
+      </div>
+      <div class="card">
+        <div class="title" style="border-left-color: #0056b3;">建筑强排信息</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom:12px;">
+          <div class="field-box" style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+            <span class="data-label">避难层层数：</span>
+            <span><span class="data-value" id="bldg-rf">0</span> 层</span>
+          </div>
+          <div class="field-box" style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+            <span class="data-label">计容层数：</span>
+            <span><span class="data-value" id="bldg-fc">0</span> 层</span>
+          </div>
+        </div>
+        <div class="row field-box" style="margin-bottom:12px;"><span class="data-label">标准层面积：</span> <span class="data-value" id="bldg-ba">0</span> 平方米
+        </div>
+        <div style="border-top:1px solid #eee; margin-bottom:12px;"></div>
+        <div class="row field-box">
+          <span style="font-weight:bold;" id="bldg-area-label">计容建筑面积：</span><span class="highlight"><span id="bldg-area">0.00</span> 平方米</span>
+        </div>
+        <div class="row field-box" id="bldg-reduced-row" style="display:none;">
+          <span style="font-weight:bold;">计容建筑面积（折减后）：</span><span class="highlight" style="color:#ff9800;"><span id="bldg-reduced-area">0.00</span> 平方米</span>
         </div>
       </div>
     </div>
@@ -420,7 +570,11 @@
         <thead>
           <tr>
             <th style="text-align:left;">编号</th>
-            <th>功能</th>
+            <th style="position:relative; text-align:center;">
+              功能
+              <button class="filter-btn" id="bldg-multi-func-btn" style="display:none;" onclick="event.stopPropagation();toggleBldgFuncDropdown()">▼</button>
+              <div class="filter-dropdown" id="bldg-multi-func-dropdown" style="display:none; min-width:80px;"></div>
+            </th>
             <th style="text-align:right;">计容建筑面积(m²)</th>
             <th id="bldg-multi-reduced-th" style="text-align:right; display:none;">折减后(m²)</th>
           </tr>
@@ -507,7 +661,7 @@
 
     <div id="site-bim" class="view-box">
       <div class="card">
-        <div class="title" style="border-left-color: #28a745;">地块信息 <span class="id-badge" style="background:#28a745;"
+        <div class="title" style="border-left-color: #28a745;">基本信息 <span class="id-badge" style="background:#28a745;"
             id="site-id">ID: --</span></div>
         <div class="row"><span class="data-label">编号：</span>
           <div style="display:flex; gap:6px; align-items:center;">
@@ -515,36 +669,39 @@
             <input type="text" id="site-no" placeholder="如 A-01" onchange="updateSite()">
           </div>
         </div>
-        <div class="row"><span class="data-label">大类：</span><select id="site-t" onchange="updateSite()"></select>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <div class="row" style="margin-bottom:0;"><span class="data-label">用地大类：</span><select id="site-t" onchange="updateSite()" style="flex:1; "></select></div>
+          <div class="row" style="margin-bottom:0;"><span class="data-label">用地性质：</span><select id="site-f" onchange="updateSite()" style="flex:1; "></select></div>
         </div>
-        <div class="row"><span class="data-label">用地性质：</span><select id="site-f" onchange="updateSite()"></select>
+      </div>
+      <div class="card">
+        <div class="title" style="border-left-color: #28a745;">
+          控规指标
+          <button id="btn-hl-check" class="toolbar-btn" style="padding:0 8px; font-size:11px; line-height:24px;" onclick="toggleHeightCheck()">📏 开启检测</button>
         </div>
         <div class="row"><span class="data-label">地块限高(m)：</span>
           <div style="display:flex; gap:6px; align-items:center;">
-            <button id="btn-hl-check" class="toolbar-btn"
-              style="padding: 0 6px; font-size: 11px; margin:0; line-height: 24px; min-width: 80px;"
-              onclick="toggleHeightCheck()">📏 开启检测</button>
             <input type="number" id="site-hl" step="1.0" onchange="updateSite()">
           </div>
         </div>
       </div>
       <div class="card">
-        <div class="title" style="border-left-color: #28a745;">几何属性</div>
-        <div class="row" style="margin-top:10px;">
+        <div class="title" style="border-left-color: #28a745;">地块强排信息</div>
+        <div class="row field-box" style="margin-bottom:8px;">
           <span style="font-weight:bold;">用地面积：</span><span class="highlight" style="color: #28a745;"><span
               id="site-area">0.00</span> m²</span>
         </div>
-        <div class="row" style="margin-top:10px;">
+        <div class="row field-box" style="margin-bottom:8px;">
           <span style="font-weight:bold;" id="site-far-label">容积率：</span><span class="highlight" style="color: #28a745;"><span id="site-far">0.00</span></span>
         </div>
-        <div class="row" id="site-reduced-far-row" style="display:none;">
+        <div class="row field-box" id="site-reduced-far-row" style="display:none; margin-bottom:8px;">
           <span style="font-weight:bold;">容积率（折减后）：</span><span class="highlight" style="color: #ff9800;"><span id="site-reduced-far">0.00</span></span>
         </div>
-        <div class="row" style="margin-top:10px;">
+        <div class="row field-box" style="margin-bottom:8px;">
           <span style="font-weight:bold;">建筑密度：</span><span class="highlight" style="color: #28a745;"><span
               id="site-density">0.0</span> %</span>
         </div>
-        <div class="row" style="margin-top:10px;">
+        <div class="row field-box" style="margin-bottom:0;">
           <span style="font-weight:bold;">绿地率：</span><span class="highlight" style="color: #28a745;"><span
               id="site-green-rate">0.0</span> % (<span id="site-green-m2">0.00</span> m²)</span>
         </div>
@@ -794,6 +951,44 @@
     }
 
     function updateBldg() { sketchup.apply_bldg(document.getElementById('bldg-h').value, document.getElementById('bldg-f').value, document.getElementById('bldg-no').value, document.getElementById('bldg-type').value, document.getElementById('bldg-th').value); }
+
+    var _rsModeBefore = null;
+
+    function onToggleMode(value) {
+      document.querySelectorAll('#rs-mode-toggle .toggle-option').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.value === value);
+      });
+      var isAuto = value === 'auto';
+      document.getElementById('bldg-rsh').style.display = isAuto ? '' : 'none';
+      document.getElementById('bldg-rsi').style.display = isAuto ? '' : 'none';
+      document.getElementById('bldg-rs-height').style.display = isAuto ? 'none' : '';
+      document.getElementById('bldg-rs-indent').style.display = isAuto ? 'none' : '';
+      if (isAuto) {
+        // 仅在模式真正从 manual 切换为 auto 时触发刷新，避免 refreshUI 调用导致无限循环
+        if (_rsModeBefore === 'manual') {
+          refreshRoofStructure();
+        }
+        _rsModeBefore = 'auto';
+      } else {
+        _rsModeBefore = 'manual';
+        document.getElementById('bldg-rs-height').value = parseFloat(document.getElementById('bldg-rsh').innerText) || 0;
+        document.getElementById('bldg-rs-indent').value = parseFloat(document.getElementById('bldg-rsi').innerText) || 10;
+      }
+    }
+
+    function refreshRoofStructure() {
+      var activeOption = document.querySelector('#rs-mode-toggle .toggle-option.active');
+      var mode = activeOption ? activeOption.dataset.value : 'auto';
+      var height, indent;
+      if (mode === 'auto') {
+        height = 0;
+        indent = 0;
+      } else {
+        height = document.getElementById('bldg-rs-height').value;
+        indent = document.getElementById('bldg-rs-indent').value;
+      }
+      sketchup.refresh_roof_structure(mode, height, indent);
+    }
     function updateSite() {
       let st = document.getElementById('site-t');
       let sf = document.getElementById('site-f').value;
@@ -824,6 +1019,16 @@
         if (showing) btn.classList.remove('active'); else btn.classList.add('active');
       }
       sketchup.toggle_site_number(idStr);
+    }
+    function toggleBldgNumber() {
+      let idStr = document.getElementById('bldg-id').innerText.replace("ID: ", "").trim();
+      let btn = document.getElementById('btn-bldg-show-number');
+      if (btn) {
+        let showing = btn.innerText === '隐藏编号';
+        btn.innerText = showing ? '显示编号' : '隐藏编号';
+        if (showing) btn.classList.remove('active'); else btn.classList.add('active');
+      }
+      sketchup.toggle_bldg_number(idStr);
     }
     function toggleBpSiteNumber() {
       let idStr = document.getElementById('bp-site-id').innerText.trim();
@@ -887,19 +1092,27 @@
             var thLabel = document.getElementById('bldg-th-label');
             var heRow = document.getElementById('bldg-he-row');
             if (data.type === '塔楼') {
-              thLabel.innerText = '塔楼建筑高度(m)：';
+              thLabel.innerText = '塔楼高度：';
               heRow.style.display = 'flex';
               document.getElementById('bldg-he').innerText = parseFloat(data.he || data.th || 0).toFixed(2);
             } else if (data.type === '裙楼') {
-              thLabel.innerText = '裙楼建筑高度(m)：';
+              thLabel.innerText = '裙楼高度：';
               heRow.style.display = 'none';
             } else {
-              thLabel.innerText = '总高度(m)：';
+              thLabel.innerText = '总高度：';
               heRow.style.display = 'none';
             }
             document.getElementById('bldg-fc').innerText = data.fc || "0";
             document.getElementById('bldg-rf').innerText = data.rf || "0";
             document.getElementById('bldg-rsh').innerText = parseFloat(data.rsh || 0).toFixed(1);
+            document.getElementById('bldg-rsi').innerText = parseFloat(data.rsi || 0).toFixed(1);
+            var rsMode = data.rs_mode || 'auto';
+            document.querySelectorAll('#rs-mode-toggle .toggle-option').forEach(function(el) {
+              el.classList.toggle('active', el.dataset.value === rsMode);
+            });
+            document.getElementById('bldg-rs-height').value = parseFloat(data.rs_manual_height || 10).toFixed(1);
+            document.getElementById('bldg-rs-indent').value = parseFloat(data.rs_manual_indent || 10).toFixed(1);
+            onToggleMode(rsMode);
             document.getElementById('bldg-ba').innerText = data.ba || "0";
 
             // 折减开关
@@ -910,6 +1123,18 @@
             } else {
               document.getElementById('bldg-area-label').innerText = '计容建筑面积：';
               document.getElementById('bldg-reduced-row').style.display = 'none';
+            }
+
+            // Building number button state
+            let bldgNumBtn = document.getElementById('btn-bldg-show-number');
+            if (bldgNumBtn) {
+              if (data.is_showing_number) {
+                bldgNumBtn.innerText = "隐藏编号";
+                bldgNumBtn.classList.add('active');
+              } else {
+                bldgNumBtn.innerText = "显示编号";
+                bldgNumBtn.classList.remove('active');
+              }
             }
           } else {
             let tEl = document.getElementById('site-t');
@@ -986,6 +1211,17 @@
           } else {
             // For building inside BP group, we can show the normal BIM card or its own group view
             document.getElementById('bldg-bim').style.display = 'block';
+            // Sync building number button state
+            let bldgNumBtn = document.getElementById('btn-bldg-show-number');
+            if (bldgNumBtn) {
+              if (data.is_showing_number) {
+                bldgNumBtn.innerText = "隐藏编号";
+                bldgNumBtn.classList.add('active');
+              } else {
+                bldgNumBtn.innerText = "显示编号";
+                bldgNumBtn.classList.remove('active');
+              }
+            }
           }
 
           document.getElementById('bp-no').innerText = data.no || "-";
@@ -1063,6 +1299,27 @@
           let tAreaEl = document.getElementById(`${type}-total`);
           if (tAreaEl) tAreaEl.innerText = parseFloat(data.totalArea || 0).toFixed(2);
 
+          // 多选功能下拉
+          if (type === 'bldg') {
+            var funcBtn = document.getElementById('bldg-multi-func-btn');
+            var funcDD = document.getElementById('bldg-multi-func-dropdown');
+            if (data.funcs && data.funcs.length > 0) {
+              funcBtn.style.display = '';
+              funcDD.innerHTML = data.funcs.map(function(f) {
+                return '<div class="filter-option">' + f + '</div>';
+              }).join('');
+              funcDD.onclick = function(e) {
+                var opt = e.target.closest('.filter-option');
+                if (opt) {
+                  sketchup.batch_set_bldg_func(opt.innerText);
+                  funcDD.style.display = 'none';
+                }
+              };
+            } else {
+              funcBtn.style.display = 'none';
+              funcDD.innerHTML = '';
+            }
+          }
           // 多选折减显示
           if (type === 'bldg') {
             var multiReducedTh = document.getElementById('bldg-multi-reduced-th');
@@ -1096,6 +1353,20 @@
       document.getElementById('tab-site').style.display = 'none';
     }
 
+    function toggleBldgFuncDropdown() {
+      var dd = document.getElementById('bldg-multi-func-dropdown');
+      if (dd) dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+    }
+    function selectBldgFunc(func) {
+      sketchup.batch_set_bldg_func(func);
+      document.getElementById('bldg-multi-func-dropdown').style.display = 'none';
+    }
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#bldg-multi-func-btn') && !e.target.closest('#bldg-multi-func-dropdown')) {
+        var dd = document.getElementById('bldg-multi-func-dropdown');
+        if (dd) dd.style.display = 'none';
+      }
+    });
     let resizeTimer;
     window.onresize = function () {
       clearTimeout(resizeTimer);

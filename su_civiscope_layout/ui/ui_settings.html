@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <style>
     body { font-family: "Segoe UI", sans-serif; background-color: #fff; margin: 0; display: flex; height: 100vh;}
-    .sidebar { width: 100px; background: #f5f5f5; border-right: 1px solid #ddd; }
+    .sidebar { width: 100px; background: #f5f5f5; border-right: 1px solid #ddd; display:flex; flex-direction:column; }
     .nav-item { padding: 15px 10px; cursor: pointer; text-align: center; font-size: 13px; color: #555; transition: 0.2s; }
     .nav-item:hover { background: #ebebeb; }
     .nav-item.active { background: #fff; color: #0056b3; font-weight: bold; border-left: 3px solid #0056b3; }
@@ -56,9 +56,9 @@
   <div class="sidebar">
     <div class="nav-item active" onclick="switchTab('tab-building')">建筑配置</div>
     <div class="nav-item" onclick="switchTab('tab-site')">用地配置</div>
-    <div class="nav-item" onclick="switchTab('tab-gui')">界面设置</div>
-    <div class="nav-item" onclick="switchTab('tab-overlay')">编号设置</div>
+    <div class="nav-item" onclick="switchTab('tab-overlay')">显示设置</div>
     <div class="nav-item" onclick="switchTab('tab-stats-cfg')">统计配置</div>
+    <div class="nav-item" style="margin-top:auto;" onclick="switchTab('tab-gui')">界面设置</div>
   </div>
   <div class="content">
     <div id="tab-building" class="tab-content active">
@@ -84,7 +84,7 @@
 
     <div id="tab-gui" class="tab-content">
       <h3 style="border-bottom-color: #6c757d;">统计中心窗口尺寸 (像素)</h3>
-      <div class="card-simple" style="padding:15px; background:#f9f9f9; border-radius:8px;">
+      <div class="card-simple" style="padding:15px; background:#f9f9f9; border-radius:8px; margin-bottom:15px;">
         <div class="row-flex" style="display:flex; align-items:center; gap:15px; margin-bottom:15px;">
           <span>宽度:</span>
           <input type="number" id="gui-stats-w" style="width:70px; padding:5px; border:1px solid #ccc; border-radius:4px;" onchange="saveGui()">
@@ -92,6 +92,17 @@
           <input type="number" id="gui-stats-h" style="width:70px; padding:5px; border:1px solid #ccc; border-radius:4px;" onchange="saveGui()">
         </div>
         <p style="font-size:11px; color:#888;">* 您也可以直接在统计中心窗口边缘进行拉伸，尺寸会自动同步到此处。</p>
+      </div>
+
+      <h3 style="border-bottom-color: #6c757d;">统计中心窗口位置 (像素)</h3>
+      <div class="card-simple" style="padding:15px; background:#f9f9f9; border-radius:8px;">
+        <div class="row-flex" style="display:flex; align-items:center; gap:15px; margin-bottom:15px;">
+          <span style="white-space:nowrap;">X坐标:</span>
+          <input type="number" id="gui-stats-x" style="flex:1; min-width:50px; padding:5px; border:1px solid #ccc; border-radius:4px;" onchange="saveGuiPos()">
+          <span style="white-space:nowrap;">Y坐标:</span>
+          <input type="number" id="gui-stats-y" style="flex:1; min-width:50px; padding:5px; border:1px solid #ccc; border-radius:4px;" onchange="saveGuiPos()">
+        </div>
+        <p style="font-size:11px; color:#888;">* 留空表示默认居中显示。坐标原点为屏幕左上角。</p>
       </div>
     </div>
 
@@ -143,17 +154,42 @@
         <p style="font-size:11px; color:#888; margin:0 0 12px 0;">配置地块编号文字的高度，修改后需重新开启"显示编号"生效。</p>
 
         <div style="margin-bottom:15px;">
-          <label style="font-size:12px; color:#555; display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <label style="font-size:12px; color:#555; display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
             <input type="checkbox" id="ol-use-hl" onchange="onUseHeightLimitChange(); saveOverlaySettings()">
-            根据地块限高标注（限高值 + 10m）
+            根据地块限高标注
           </label>
+          <div id="ol-offset-row" style="display:none; margin-left:24px; margin-top:8px;">
+            <label style="font-size:12px; color:#555; display:block; margin-bottom:4px;">位置偏移 (m)</label>
+            <input type="number" id="ol-offset" min="-50" max="50" step="0.5" value="0" onchange="saveOverlaySettings()" style="width:100px; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:13px;">
+          </div>
         </div>
 
         <div style="margin-bottom:15px;">
-          <label style="font-size:12px; color:#555; display:block; margin-bottom:4px;">离地高度 (m)</label>
-          <input type="number" id="ol-height" min="0.1" max="50" step="0.1" value="2.0" onchange="saveOverlaySettings()" style="width:100px; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:13px;">
+          <label style="font-size:12px; color:#555; display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+            <input type="checkbox" id="ol-use-fixed" onchange="onUseFixedChange(); saveOverlaySettings()">
+            根据固定值标注
+          </label>
+          <div id="ol-fixed-row" style="display:none; margin-left:24px; margin-top:8px;">
+            <label style="font-size:12px; color:#555; display:block; margin-bottom:4px;">离地高度 (m)</label>
+            <input type="number" id="ol-height" min="0.1" max="50" step="0.1" value="2.0" onchange="saveOverlaySettings()" style="width:100px; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:13px;">
+          </div>
+        </div>
+      
+      <h3 style="border-bottom-color: #0056b3; margin-top:20px;">建筑编号显示参数</h3>
+      <div class="card-simple" style="padding:15px; background:#f9f9f9; border-radius:8px;">
+        <p style="font-size:11px; color:#888; margin:0 0 12px 0;">配置建筑编号文字的高度，修改后需重新开启"显示编号"生效。</p>
+        <div style="margin-bottom:15px;">
+          <label style="font-size:12px; color:#555; display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+            <input type="checkbox" checked disabled>
+            根据建筑高度标注
+          </label>
+          <div style="margin-left:24px; margin-top:8px;">
+            <label style="font-size:12px; color:#555; display:block; margin-bottom:4px;">位置偏移 (m)</label>
+            <input type="number" id="bldg-ol-offset" min="-50" max="50" step="0.5" value="0" onchange="saveOverlayBldgSettings()" style="width:100px; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:13px;">
+          </div>
         </div>
       </div>
+</div>
     </div>
   </div>
 
@@ -264,6 +300,11 @@
       if (payload.stats_size) {
         document.getElementById('gui-stats-w').value = payload.stats_size[0];
         document.getElementById('gui-stats-h').value = payload.stats_size[1];
+      }
+      // 位置
+      if (payload.stats_pos) {
+        document.getElementById('gui-stats-x').value = payload.stats_pos[0] || '';
+        document.getElementById('gui-stats-y').value = payload.stats_pos[1] || '';
       }
 
       // 建筑部分
@@ -468,23 +509,68 @@
       let h = document.getElementById('gui-stats-h').value;
       sketchup.update_stats_size(w, h);
     }
+    function saveGuiPos() {
+      let x = document.getElementById('gui-stats-x').value;
+      let y = document.getElementById('gui-stats-y').value;
+      sketchup.update_stats_pos(x || null, y || null);
+    }
 
     // ========== 编号设置 ==========
-    function renderOverlaySettings(height, useHeightLimit) {
-      document.getElementById('ol-height').value = height;
-      document.getElementById('ol-use-hl').checked = useHeightLimit;
-      document.getElementById('ol-height').disabled = useHeightLimit;
+    function renderOverlaySettings(data) {
+      document.getElementById('ol-use-hl').checked = data.use_height_limit;
+      document.getElementById('ol-offset').value = data.height_offset;
+      document.getElementById('ol-use-fixed').checked = data.use_fixed_height;
+      document.getElementById('ol-height').value = data.height;
+
+      // Mutual exclusion: only one option active
+      document.getElementById('ol-offset-row').style.display = data.use_height_limit ? '' : 'none';
+      document.getElementById('ol-fixed-row').style.display = data.use_fixed_height ? '' : 'none';
+      if (data.use_height_limit) {
+        document.getElementById('ol-use-fixed').checked = false;
+      }
+      if (data.use_fixed_height) {
+        document.getElementById('ol-use-hl').checked = false;
+      }
     }
 
     function onUseHeightLimitChange() {
       var checked = document.getElementById('ol-use-hl').checked;
-      document.getElementById('ol-height').disabled = checked;
+      document.getElementById('ol-offset-row').style.display = checked ? '' : 'none';
+      if (checked) {
+        document.getElementById('ol-use-fixed').checked = false;
+        document.getElementById('ol-fixed-row').style.display = 'none';
+      }
+    }
+
+    function onUseFixedChange() {
+      var checked = document.getElementById('ol-use-fixed').checked;
+      document.getElementById('ol-fixed-row').style.display = checked ? '' : 'none';
+      if (checked) {
+        document.getElementById('ol-use-hl').checked = false;
+        document.getElementById('ol-offset-row').style.display = 'none';
+      }
     }
 
     function saveOverlaySettings() {
-      var height = document.getElementById('ol-height').value;
-      var useHl = document.getElementById('ol-use-hl').checked;
-      try { sketchup.save_overlay_settings(height, useHl); } catch(e) {}
+      var data = {
+        use_height_limit: document.getElementById('ol-use-hl').checked,
+        height_offset: parseFloat(document.getElementById('ol-offset').value) || 0,
+        use_fixed_height: document.getElementById('ol-use-fixed').checked,
+        height: parseFloat(document.getElementById('ol-height').value) || 2.0
+      };
+      try { sketchup.save_overlay_settings(JSON.stringify(data)); } catch(e) {}
+    }
+
+    // ========== 建筑编号设置 ==========
+    function renderOverlayBldgSettings(data) {
+      document.getElementById('bldg-ol-offset').value = data.offset;
+    }
+
+    function saveOverlayBldgSettings() {
+      var data = {
+        offset: parseFloat(document.getElementById('bldg-ol-offset').value) || 0
+      };
+      try { sketchup.save_overlay_bldg_settings(JSON.stringify(data)); } catch(e) {}
     }
 
     // ========== 计容面积折减设置 ==========
@@ -571,12 +657,15 @@
       } catch(e) {}
     }
 
-    // Trigger stats-cfg tab load when switching to it
+    // Trigger per-tab data load when switching tabs
     var origSwitchTab2 = switchTab;
     switchTab = function(tabId) {
       origSwitchTab2(tabId);
       if (tabId === 'tab-stats-cfg') {
         try { sketchup.load_reduction_settings(); } catch(e) {}
+      } else if (tabId === 'tab-overlay') {
+        try { sketchup.load_overlay_settings(); } catch(e) {}
+        try { sketchup.load_overlay_bldg_settings(); } catch(e) {}
       }
     };
   </script>

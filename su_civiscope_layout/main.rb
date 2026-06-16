@@ -9,7 +9,7 @@ module CiviscopeLayout
     # 0. 全局常量与配置中心
     # ==========================================
     PLUGIN_NAME = "Civiscope_Layout" unless defined?(PLUGIN_NAME)
-    VERSION = "0.1.5-beta" unless defined?(VERSION)
+    VERSION = "0.1.6-beta" unless defined?(VERSION)
     AUTHOR = "MaxExcelsior" unless defined?(AUTHOR)
     
     DEFAULT_BLDG_FUNCS = ["办公", "商业", "居住", "公服设施", "市政设施", "交通设施", "工业", "仓储"] unless defined?(DEFAULT_BLDG_FUNCS)
@@ -69,49 +69,67 @@ module CiviscopeLayout
     # 辅助功能：热重载 (开发调试用)
     # ==========================================
     def self.reload
-      # 0. 移除常量以便重载时更新
+      model = Sketchup.active_model
+
+      # 0. 清理所有运行时状态（避免 reload 后悬空引用导致卡死）
+      self.cancel_pending_recalc
+      self.cancel_all_site_numbers rescue nil
+      self.cancel_all_bldg_numbers rescue nil
+
+      # 关闭所有打开的对话框
+      @dialog_stats&.close rescue nil
+      @dialog_settings&.close rescue nil
+      @dialog_about&.close rescue nil
+      @dialog_picker_settings&.close rescue nil
+
+      # 清空旧 overlay 数据，避免重定义类后 C++ 端引用失效
+      @overlay&.sites_data&.clear rescue nil
+
+      # 1. 清理现有观察者
+      if model && defined?(ObserverManager)
+        ObserverManager.cleanup_all_observers(model)
+      end
+
+      # 2. 移除常量以便重载时重新定义
       remove_const(:DEFAULT_BLDG_FUNCS) if defined?(DEFAULT_BLDG_FUNCS)
       remove_const(:DEFAULT_SITE_FUNCS) if defined?(DEFAULT_SITE_FUNCS)
       remove_const(:SITE_TYPES) if defined?(SITE_TYPES)
       remove_const(:COLOR_MAP) if defined?(COLOR_MAP)
+      remove_const(:VERSION) if defined?(VERSION)
+      remove_const(:PLUGIN_NAME) if defined?(PLUGIN_NAME)
+      remove_const(:AUTHOR) if defined?(AUTHOR)
       remove_const(:MODIFICATION_TOOL_IDS) if defined?(MODIFICATION_TOOL_IDS)
-      
-      # 1. 清理现有观察者
-      model = Sketchup.active_model
-      if model && defined?(ObserverManager)
-        ObserverManager.cleanup_all_observers(model)
-      end
-      
-      # 2. 加载主文件
-      load __FILE__
+
+      # 3. 先加载子模块文件（确保方法定义全部刷新，再加载主文件）
       load File.join(__dir__, 'settings.rb')
-      
-      # 3. 加载工具类（新增 logger）
       load File.join(__dir__, 'utils', 'logger.rb')
       load File.join(__dir__, 'utils', 'attr_helper.rb')
       load File.join(__dir__, 'utils', 'geom_helper.rb')
-      
-      # 4. 加载逻辑类
       load File.join(__dir__, 'logic', 'bldg_manager.rb')
       load File.join(__dir__, 'logic', 'site_manager.rb')
       load File.join(__dir__, 'logic', 'stats_engine.rb')
       load File.join(__dir__, 'logic', 'building_setback.rb')
-      
-      # 5. 加载观察者（新增 observer_manager）
       load File.join(__dir__, 'observers', 'observer_manager.rb')
       load File.join(__dir__, 'observers', 'model_watcher.rb')
       load File.join(__dir__, 'observers', 'selection_watcher.rb')
       load File.join(__dir__, 'observers', 'entity_watcher.rb')
-      
-      # 6. 加载 UI 与渲染
       load File.join(__dir__, 'ui', 'picker_tool.rb')
       load File.join(__dir__, 'ui', 'setback_tool.rb')
       load File.join(__dir__, 'ui', 'context_menu.rb')
       load File.join(__dir__, 'render', 'height_overlay.rb')
       load File.join(__dir__, 'render', 'site_number_overlay.rb')
       load File.join(__dir__, 'ui', 'stats_dialog.rb')
-      
-      # 7. 输出日志
+
+      # 4. 最后加载主文件（此时所有子模块方法已就绪）
+      load __FILE__
+
+      # 5. 重置模块实例变量
+      @overlay = nil
+      @dialog_stats = nil
+      @dialog_settings = nil
+      @dialog_about = nil
+      @dialog_picker_settings = nil
+
       Logger.info("代码模块化重载完成")
       UI.messagebox("插件及所有模块已重新加载！\n观察者已清理并重新注册。")
       return true

@@ -34,14 +34,11 @@ module CiviscopeLayout
     end
 
     def self.do_apply_bldg(h, f, no, type = nil, th = nil)
-      puts "[DEBUG-FL] do_apply_bldg ENTER h=#{h} f=#{f} th=#{th} type=#{type}"
       @pending_recalc_entity = nil
       model = Sketchup.active_model
       model.start_operation('修改建筑属性', true)
       model.selection.to_a.each do |inst|
-        eid = get_short_id(inst) rescue '?'
         next unless inst.get_attribute("dynamic_attributes", "bldg_func")
-        puts "[DEBUG-FL] do_apply_bldg processing entity=#{eid}"
 
         req_th = th.to_f
 
@@ -286,24 +283,56 @@ module CiviscopeLayout
       short_edge * ratio
     end
 
-    # 将多边形顶点向内偏移（XY 平面，朝质心方向）
+    # 将多边形顶点向内偏移（XY 平面，沿边的垂线方向）
     def self.offset_polygon_vertices(vertices, distance)
-      return nil if vertices.length < 3
+      return nil if vertices.length < 3 || distance <= 0
       z = vertices.first.z
-      cx = vertices.map(&:x).sum / vertices.length.to_f
-      cy = vertices.map(&:y).sum / vertices.length.to_f
-      result = vertices.map do |v|
-        dx = v.x - cx
-        dy = v.y - cy
-        dist = Math.sqrt(dx*dx + dy*dy)
-        if dist < 0.001
-          Geom::Point3d.new(cx, cy, z)
+      n = vertices.length
+
+      # 投影到 2D
+      pts = vertices.map { |v| Geom::Point3d.new(v.x, v.y, 0) }
+
+      # 判断绕组方向
+      signed_area = 0.0
+      n.times { |i| j = (i + 1) % n; signed_area += pts[i].x * pts[j].y - pts[j].x * pts[i].y }
+      is_ccw = signed_area > 0
+
+      # 每条边的方向与内法线
+      segs = []
+      n.times do |i|
+        j = (i + 1) % n
+        dx = pts[j].x - pts[i].x
+        dy = pts[j].y - pts[i].y
+        len = Math.sqrt(dx * dx + dy * dy)
+        next if len < 1e-8
+        dir = Geom::Vector3d.new(dx / len, dy / len, 0)
+        normal = is_ccw ? Geom::Vector3d.new(-dir.y, dir.x, 0)
+                        : Geom::Vector3d.new(dir.y, -dir.x, 0)
+        segs << { dir: dir, normal: normal, origin: pts[i] }
+      end
+      return nil if segs.length < 3
+
+      # 相邻边的偏移线求交 → 新顶点
+      result = []
+      m = segs.length
+      m.times do |i|
+        a = segs[i]
+        b = segs[(i + 1) % m]
+        pa = Geom::Point3d.new(
+          a[:origin].x + a[:normal].x * distance,
+          a[:origin].y + a[:normal].y * distance, 0)
+        pb = Geom::Point3d.new(
+          b[:origin].x + b[:normal].x * distance,
+          b[:origin].y + b[:normal].y * distance, 0)
+        inter = Geom.intersect_line_line([pa, a[:dir]], [pb, b[:dir]])
+        if inter.is_a?(Geom::Point3d)
+          result << Geom::Point3d.new(inter.x, inter.y, z)
         else
-          scale = (dist - distance) / dist
-          Geom::Point3d.new(cx + dx * scale, cy + dy * scale, z)
+          result << Geom::Point3d.new(pa.x, pa.y, z)
         end
       end
-      result.uniq { |v| [v.x.round(6), v.y.round(6), v.z.round(6)] }
+
+      result.uniq { |v| [v.x.round(6), v.y.round(6)] }
     end
 
     # 创建屋顶构筑物3D几何（仅塔楼和独立建筑）
@@ -325,7 +354,23 @@ module CiviscopeLayout
 
       local_scale_z = entity.transformation.zscale
       roof_sh_inch = (roof_structure_height_m / 0.0254) / local_scale_z
-      offset_inch = (10.0 / 0.0254) / local_scale_z  # 固定 10m
+
+      # 读取缩进距离
+      rs_mode = entity.get_attribute("dynamic_attributes", "roof_structure_mode")
+      if rs_mode == 'manual'
+        manual_indent = entity.get_attribute("dynamic_attributes", "roof_structure_manual_indent").to_f
+        indent_m = manual_indent >= 0 ? manual_indent : 10.0
+      else
+        # 居住建筑自动模式：缩进3m，其他10m
+        bldg_func = entity.get_attribute("dynamic_attributes", "bldg_func")
+        indent_m = bldg_func == '居住' ? 3.0 : 10.0
+      end
+      # 使用 XY 平均缩放系数修正缩进，确保缩放体块后缩进值在显示空间保持不变
+      scale_x = entity.transformation.xscale.abs
+      scale_y = entity.transformation.yscale.abs
+      avg_xy_scale = (scale_x + scale_y) / 2.0
+      avg_xy_scale = 1.0 if avg_xy_scale < 0.001
+      offset_inch = (indent_m / 0.0254) / avg_xy_scale
 
       top_verts = top_face.outer_loop.vertices.map(&:position)
       inner_verts = offset_polygon_vertices(top_verts, offset_inch)
@@ -343,8 +388,6 @@ module CiviscopeLayout
     end
 
     def self.calc_bldg_data(entity, skip_operation = false)
-      eid = get_short_id(entity) rescue '?'
-      puts "[DEBUG-FL] calc_bldg_data ENTER entity=#{eid} skip_operation=#{skip_operation} skip_recalc=#{CiviscopeLayout::Core.skip_recalc}"
       @pending_recalc_entity = nil
       UI.stop_timer(@skip_recalc_restore_timer_id) if @skip_recalc_restore_timer_id
       CiviscopeLayout::Core.skip_recalc = true
@@ -355,7 +398,6 @@ module CiviscopeLayout
         ObserverManager.attach_entity_observers(entity)
         made_unique = true
       end
-      puts "[DEBUG-FL] calc_bldg_data is_component=#{entity.is_a?(Sketchup::ComponentInstance)} made_unique=#{made_unique}"
 
       model = Sketchup.active_model
       model.start_operation('更新体块数据', true, true, true) unless skip_operation
@@ -364,19 +406,16 @@ module CiviscopeLayout
         # 恢复建筑至完整高度，移除旧屋顶构筑物，确保为干净的 manifold solid
         old_roof_sh = entity.get_attribute("dynamic_attributes", "roof_structure_height").to_f
         had_roof = old_roof_sh > 0
-        puts "[DEBUG-FL] calc_bldg_data had_roof=#{had_roof} old_roof_sh=#{old_roof_sh}"
         if had_roof
           self.remove_roof_structure(entity)
           self.push_top_face(entity, old_roof_sh)
         end
 
         is_manifold = entity.manifold?
-        puts "[DEBUG-FL] calc_bldg_data manifold=#{is_manifold}"
         # 注意：不在此处 return——分层线 group 会破坏 manifold 检查，
         # 若直接 return 则永远无法清理旧分层线。后续 push_top_face 和
         # create_roof_structure 在找不到顶面时会安全跳过，不会崩溃。
         fh = entity.get_attribute("dynamic_attributes", "floor_height").to_f
-        puts "[DEBUG-FL] calc_bldg_data fh=#{fh}"
         return if fh <= 0
 
         bldg_type = entity.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
@@ -388,6 +427,17 @@ module CiviscopeLayout
         h_effective = self.compute_effective_h(entity, bldg_type, th_m)
         roof_sh = self.compute_roof_structure_height(h_effective)
         refuge_fl = self.compute_refuge_floors(h_effective)
+
+        # 手动/自动模式处理
+        rs_mode = entity.get_attribute("dynamic_attributes", "roof_structure_mode")
+        if rs_mode == 'manual'
+          manual_h = entity.get_attribute("dynamic_attributes", "roof_structure_manual_height").to_f
+          roof_sh = manual_h if manual_h >= 0
+        else
+          # 居住建筑：真高≥100m时屋顶构筑物高5m，<100m时为0
+          bldg_func = entity.get_attribute("dynamic_attributes", "bldg_func")
+          roof_sh = 5.0 if bldg_func == '居住' && h_effective >= 100
+        end
 
         has_roof = (bldg_type == "塔楼" || bldg_type == "独立") && roof_sh > 0
 
@@ -417,9 +467,6 @@ module CiviscopeLayout
                       (entity.get_attribute("dynamic_attributes", "roof_structure_height") != roof_sh.to_s) ||
                       (entity.get_attribute("dynamic_attributes", "refuge_floors") != refuge_fl.to_s)
 
-        puts "[DEBUG-FL] calc_bldg_data th_m=#{th_m} fh=#{fh} fc=#{fc} b_area=#{b_area} t_area=#{t_area} roof_sh=#{roof_sh} physical_floors=#{physical_floors} need_update=#{need_update}"
-        puts "[DEBUG-FL] calc_bldg_data stored: total_h=#{entity.get_attribute("dynamic_attributes", "total_height")} fc=#{entity.get_attribute("dynamic_attributes", "floor_count")} b_area=#{entity.get_attribute("dynamic_attributes", "base_area")} bldg_area=#{entity.get_attribute("dynamic_attributes", "bldg_area")} roof_sh=#{entity.get_attribute("dynamic_attributes", "roof_structure_height")}"
-
         if need_update
           if has_roof
             self.push_top_face(entity, -roof_sh)
@@ -435,14 +482,12 @@ module CiviscopeLayout
           entity.set_attribute("dynamic_attributes", "roof_structure_height", roof_sh.to_s)
           entity.set_attribute("dynamic_attributes", "refuge_floors", refuge_fl.to_s)
 
-          puts "[DEBUG-FL] calc_bldg_data → calling update_floor_lines(physical_floors=#{physical_floors}, fh=#{fh}, fl_roof_sh=#{fl_roof_sh})"
           self.update_floor_lines(entity, physical_floors, fh, fl_roof_sh)
 
           if has_roof
             self.create_roof_structure(entity, roof_sh)
           end
         else
-          puts "[DEBUG-FL] calc_bldg_data need_update=FALSE — skipping floor_lines update"
           # 无需更新，恢复原有切除状态
           if had_roof
             self.push_top_face(entity, -old_roof_sh)
@@ -459,8 +504,6 @@ module CiviscopeLayout
     end
 
     def self.update_floor_lines(entity, floor_count, floor_height_m, roof_structure_height_m = 0)
-      eid = get_short_id(entity) rescue '?'
-      puts "[DEBUG-FL] update_floor_lines ENTER entity=#{eid} floor_count=#{floor_count} floor_height_m=#{floor_height_m} roof_sh_m=#{roof_structure_height_m}"
 
       # 确保定义独立，避免复制体之间相互影响
       if entity.is_a?(Sketchup::ComponentInstance) && entity.make_unique
@@ -470,34 +513,20 @@ module CiviscopeLayout
 
       ents = (entity.is_a?(Sketchup::ComponentInstance) || entity.is_a?(Sketchup::Group)) ? entity.definition.entities : nil
       unless ents
-        puts "[DEBUG-FL] update_floor_lines RETURN: no entities collection"
         return
       end
 
-      # Dump all groups in definition before cleanup
-      all_groups_before = ents.grep(Sketchup::Group)
-      puts "[DEBUG-FL] update_floor_lines total groups in def=#{all_groups_before.size}: #{all_groups_before.map { |g| "name='#{g.name}' attr=#{g.get_attribute('civiscope', 'is_floor_lines_group').inspect} valid=#{g.valid?}" }.join(' | ')}"
-
       # Clear old floor lines (both legacy edges and new group style)
       old_edges = ents.grep(Sketchup::Edge).select { |e| e.get_attribute("civiscope", "is_floor_line") }
-      puts "[DEBUG-FL] update_floor_lines old_edges=#{old_edges.size}"
       ents.erase_entities(old_edges) if old_edges.any?
 
       old_groups = ents.grep(Sketchup::Group).select { |g|
         g.get_attribute("civiscope", "is_floor_lines_group") || g.name == "Floor Lines"
       }
-      puts "[DEBUG-FL] update_floor_lines old_groups found=#{old_groups.size}: #{old_groups.map { |g| "name='#{g.name}' valid=#{g.valid?} entities=#{g.entities.size}" }.join(' | ')}"
 
       old_groups.each { |g|
-        puts "[DEBUG-FL] update_floor_lines erasing group name='#{g.name}' valid=#{g.valid?}"
         g.erase! if g.valid?
       }
-
-      # Verify cleanup
-      remaining = ents.grep(Sketchup::Group).select { |g|
-        g.get_attribute("civiscope", "is_floor_lines_group") || g.name == "Floor Lines"
-      }
-      puts "[DEBUG-FL] update_floor_lines after erase, remaining old groups=#{remaining.size}"
 
       floor_count = floor_count.to_i
       return if floor_count <= 1

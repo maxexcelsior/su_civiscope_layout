@@ -4,7 +4,7 @@
 
 **专为城市规划师设计的 SketchUp 体块管理插件**
 
-[![Version](https://img.shields.io/badge/version-0.1.5--beta-blue.svg)](https://github.com/MaxExcelsior/su_civiscope_layout)
+[![Version](https://img.shields.io/badge/version-0.1.6--beta-blue.svg)](https://github.com/MaxExcelsior/su_civiscope_layout)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![SketchUp](https://img.shields.io/badge/SketchUp-2024+-orange.svg)](https://www.sketchup.com/)
 
@@ -249,20 +249,24 @@ CiviscopeLayout::Logger.info("调试信息")
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解版本更新历史。
 
-### 最新版本：v0.1.5-beta (2026-05-14)
+### 最新版本：v0.1.6-beta (2026-06-16)
 
 **新增功能：**
-- ✨ 绘制建筑退线工具 — 支持多层退线生成、边导航对话框、临水/临绿快捷输入
-- ✨ 计容面积折减系数 — 裙楼/塔楼按高度区间分段折减，统计面板全视图支持
-- ✨ 建筑基底填充工具 — 材质面积法计算建筑密度，与绿地率算法统一
-- ✨ 地块编号叠加层显示
+- ✨ 屋顶构筑物 UI 重构 — 自动/手动模式切换、刷新按钮一键生成
+- ✨ 建筑编号叠加层 — `TX-建筑编号` 图层，智能高度定位
+- ✨ 地块编号叠加层增强 — 限高标注/固定值双模式互斥切换
+- ✨ 统计面板卡片重组 — 强排信息、控规指标独立卡片
+- ✨ 设置面板重组 — 标签页顺序调整、显示设置合并、X/Y位置参数
+- ✨ 多选建筑批量功能修改
 
 **优化改进：**
-- 🔧 Scale 工具修改后指标实时刷新（onTransactionCommit）
-- 🔧 屋顶构筑物跨 100m 阈值时面丢失/卡顿修复
-- 🔧 撤销操作修复（透明 undo operation 包裹）
-- 🔧 建筑密度算法由多边形去重改为材质面积法
-- 🔧 分层线群组统一归入 `000-分层线` SU图层
+- 🔧 布局标准化 — 统一字体/字重、中文单位、功能/类型同行
+- 🔧 热重载卡死修复 — 清理状态、调整加载顺序、重置模块变量
+- 🔧 居住建筑屋顶规则 — <100m 无屋顶，≥100m 自动 5m 高 3m 缩进
+- 🔧 Scale 工具屋顶构筑物缩进修正（avg_xy_scale）
+- 🔧 修复 refreshUI → onToggleMode 无限回调循环
+- 🔧 分层线群组归入 `000-分层线` SU 图层
+- 🔧 移除调试日志输出，优化性能
 
 ---
 

@@ -9,12 +9,18 @@ module CiviscopeLayout
       
       w, h = self.get_stats_size
       @dialog_stats = UI::HtmlDialog.new({:dialog_title => "📊 统计中心", :width => w, :height => h, :style => UI::HtmlDialog::STYLE_DIALOG})
-      self.center_dialog(@dialog_stats, w, h)
+      pos_x, pos_y = self.get_stats_pos
+      if pos_x && pos_y
+        @dialog_stats.set_position(pos_x, pos_y)
+      else
+        self.center_dialog(@dialog_stats, w, h)
+      end
       @dialog_stats.set_file(File.join(__dir__, 'ui_stats.html'))
       
       # Ensure overlays are registered
       self.ensure_height_check_overlay(Sketchup.active_model)
       self.ensure_site_number_overlay(Sketchup.active_model)
+      self.ensure_bldg_number_overlay(Sketchup.active_model)
       
       @dialog_stats.add_action_callback("on_tab_changed") do |_, tab_id|
         @current_active_tab = tab_id
@@ -25,10 +31,41 @@ module CiviscopeLayout
 
       @dialog_stats.add_action_callback("convert_bldg") { self.do_convert_bldg }
       @dialog_stats.add_action_callback("apply_bldg") { |_, h, f, no, type, th| self.do_apply_bldg(h, f, no, type, th) }
+      @dialog_stats.add_action_callback("batch_set_bldg_func") do |_, func|
+        model = Sketchup.active_model
+        model.start_operation('批量修改建筑功能', true)
+        model.selection.to_a.each do |inst|
+          next unless inst.get_attribute("dynamic_attributes", "bldg_func")
+          inst.set_attribute("dynamic_attributes", "bldg_func", func)
+          self.auto_recalculate(inst, true, true)
+        end
+        self.refresh_stats_ui(model.selection)
+        model.commit_operation
+      end
       @dialog_stats.add_action_callback("convert_site") { self.do_convert_site }
       @dialog_stats.add_action_callback("apply_site") { |_, t, f, no, hl| self.do_apply_site(t, f, no, hl) }
+      @dialog_stats.add_action_callback("refresh_roof_structure") do |_, mode, height, indent|
+        model = Sketchup.active_model
+        model.start_operation('刷新屋顶构筑物', true)
+        model.selection.to_a.each do |inst|
+          next unless inst.get_attribute("dynamic_attributes", "bldg_func")
+          inst.set_attribute("dynamic_attributes", "roof_structure_mode", mode.to_s)
+          if mode == 'manual'
+            inst.set_attribute("dynamic_attributes", "roof_structure_manual_height", height.to_s)
+            inst.set_attribute("dynamic_attributes", "roof_structure_manual_indent", indent.to_s)
+          else
+            # 切换回自动模式时清理手动参数，下次切回手动时重置为默认值
+            inst.set_attribute("dynamic_attributes", "roof_structure_manual_height", nil)
+            inst.set_attribute("dynamic_attributes", "roof_structure_manual_indent", nil)
+          end
+          self.auto_recalculate(inst, true, true)
+        end
+        self.refresh_stats_ui(model.selection)
+        model.commit_operation
+      end
       @dialog_stats.add_action_callback("toggle_height_check") { |_, id| self.do_toggle_height_check(id) }
       @dialog_stats.add_action_callback("toggle_site_number") { |_, id| self.toggle_site_number(id) }
+      @dialog_stats.add_action_callback("toggle_bldg_number") { |_, id| self.toggle_bldg_number(id) }
       @dialog_stats.add_action_callback("set_all_height_checks") { |_, status| self.do_set_all_height_checks(status) }
       @dialog_stats.add_action_callback("start_picker") { |_, mode| Sketchup.active_model.select_tool(FunctionPickerTool.new(mode)) }
       @dialog_stats.add_action_callback("show_picker_settings") { |_, type| self.show_picker_settings_dialog(type) }
@@ -37,7 +74,7 @@ module CiviscopeLayout
       @dialog_stats.add_action_callback("activate_greenery_tool") { self.do_activate_greenery_tool }
       @dialog_stats.add_action_callback("activate_base_tool") { self.do_activate_base_tool }
       @dialog_stats.add_action_callback("ready") { self.refresh_stats_ui(Sketchup.active_model.selection) }
-      @dialog_stats.add_action_callback("on_resized") { |_, w, h| self.save_stats_size(w.to_i, h.to_i) }
+      @dialog_stats.add_action_callback("on_resized") { |_, w, h| self.save_stats_size(w.to_i, h.to_i); self.refresh_settings_ui }
       @dialog_stats.set_on_closed { @dialog_stats = nil }
       @dialog_stats.show
       
@@ -117,9 +154,25 @@ module CiviscopeLayout
             type: bldg_type,
             rf: t.get_attribute("dynamic_attributes", "refuge_floors") || "0",
             rsh: t.get_attribute("dynamic_attributes", "roof_structure_height") || "0",
+            rs_mode: t.get_attribute("dynamic_attributes", "roof_structure_mode") || "auto",
+            rs_manual_height: t.get_attribute("dynamic_attributes", "roof_structure_manual_height") || t.get_attribute("dynamic_attributes", "roof_structure_height") || "10",
+            rs_manual_indent: t.get_attribute("dynamic_attributes", "roof_structure_manual_indent") || "10",
             reduced_area: reduction_enabled ? reduced_area.to_s : nil,
-            reduction_enabled: reduction_enabled
+            reduction_enabled: reduction_enabled,
+            is_showing_number: self.bldg_number_visible?(self.get_short_id(t))
           })
+          # Compute displayed indent for auto mode
+          rsh_val = t.get_attribute("dynamic_attributes", "roof_structure_height").to_f
+          rs_mode_val = t.get_attribute("dynamic_attributes", "roof_structure_mode") || "auto"
+          bldg_func_val = t.get_attribute("dynamic_attributes", "bldg_func") || ""
+          if (bldg_type == "塔楼" || bldg_type == "独立") && rsh_val > 0
+            display_indent = rs_mode_val == 'manual' ?
+              t.get_attribute("dynamic_attributes", "roof_structure_manual_indent").to_f :
+              (bldg_func_val == '居住' ? 3.0 : 10.0)
+          else
+            display_indent = 0.0
+          end
+          data[:rsi] = display_indent.to_s
           @dialog_stats.execute_script("refreshUI('bldg', '#{mode}', [], #{all_funcs.to_json}, #{data.to_json})")
         else
           bldg_ents = self.find_buildings_on_site(t)
@@ -206,7 +259,15 @@ module CiviscopeLayout
         end
         has_global_hl = @overlay && !@overlay.sites_data.empty?
         multi_reduction_enabled = type == 'bldg' ? reduction_enabled : false
-        @dialog_stats.execute_script("refreshUI('#{type}', 'multi', [], [], { list: #{list_data.to_json}, totalArea: #{total_area}, reducedTotalArea: #{multi_reduction_enabled ? reduced_total_area : 'null'}, reduction_enabled: #{multi_reduction_enabled}, global_hl_on: #{has_global_hl} })")
+        multi_data = {
+          list: list_data,
+          totalArea: total_area,
+          reducedTotalArea: multi_reduction_enabled ? reduced_total_area : nil,
+          reduction_enabled: multi_reduction_enabled,
+          global_hl_on: has_global_hl
+        }
+        multi_data[:funcs] = all_funcs if type == 'bldg'
+        @dialog_stats.execute_script("refreshUI('#{type}', 'multi', [], [], #{multi_data.to_json})")
       end
     end
 

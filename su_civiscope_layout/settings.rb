@@ -78,6 +78,25 @@ module CiviscopeLayout
       self.save_config(config)
     end
 
+    def self.get_stats_pos
+      config = self.load_config
+      x = config["stats_pos_x"]
+      y = config["stats_pos_y"]
+      [x, y]
+    end
+
+    def self.save_stats_pos(x, y)
+      config = self.load_config
+      if x.nil? || y.nil?
+        config.delete("stats_pos_x")
+        config.delete("stats_pos_y")
+      else
+        config["stats_pos_x"] = x.to_i
+        config["stats_pos_y"] = y.to_i
+      end
+      self.save_config(config)
+    end
+
     # 属性刷筛选配置
     def self.get_picker_filter(type)
       config = self.load_config
@@ -163,15 +182,33 @@ module CiviscopeLayout
     def self.get_overlay_number_settings
       config = self.load_config
       {
-        "height" => config["overlay_number_height"] || 2.0,
-        "use_height_limit" => config["overlay_use_height_limit"] || false
+        "use_height_limit" => config["overlay_use_height_limit"] == true,
+        "height_offset" => config["overlay_height_offset"] || 0.0,
+        "use_fixed_height" => config["overlay_use_fixed_height"] == true,
+        "height" => config["overlay_number_height"] || 2.0
       }
     end
 
-    def self.save_overlay_number_settings(height, use_height_limit)
+    def self.save_overlay_number_settings(data)
       config = self.load_config
-      config["overlay_number_height"] = height.to_f
-      config["overlay_use_height_limit"] = use_height_limit ? true : false
+      config["overlay_use_height_limit"] = data["use_height_limit"] == true
+      config["overlay_height_offset"] = data["height_offset"].to_f
+      config["overlay_use_fixed_height"] = data["use_fixed_height"] == true
+      config["overlay_number_height"] = data["height"].to_f
+      self.save_config(config)
+    end
+
+    # 建筑编号显示参数
+    def self.get_overlay_bldg_settings
+      config = self.load_config
+      {
+        "offset" => config["bldg_overlay_offset"] || 0.0
+      }
+    end
+
+    def self.save_overlay_bldg_settings(data)
+      config = self.load_config
+      config["bldg_overlay_offset"] = data["offset"].to_f
       self.save_config(config)
     end
 
@@ -238,13 +275,31 @@ module CiviscopeLayout
         end
       end
 
-      @dialog_settings.add_action_callback("load_overlay_settings") do
-        settings = self.get_overlay_number_settings
-        @dialog_settings.execute_script("renderOverlaySettings(#{settings['height'].to_f}, #{settings['use_height_limit']})")
+      @dialog_settings.add_action_callback("update_stats_pos") do |_, x, y|
+        self.save_stats_pos(x, y)
+        if @dialog_stats && @dialog_stats.visible?
+          @dialog_stats.set_position(x.to_i, y.to_i) if x && y
+        end
       end
 
-      @dialog_settings.add_action_callback("save_overlay_settings") do |_, height, use_height_limit|
-        self.save_overlay_number_settings(height, use_height_limit)
+      @dialog_settings.add_action_callback("load_overlay_settings") do
+        settings = self.get_overlay_number_settings
+        @dialog_settings.execute_script("renderOverlaySettings(#{settings.to_json})")
+      end
+
+      @dialog_settings.add_action_callback("save_overlay_settings") do |_, json_str|
+        data = JSON.parse(json_str)
+        self.save_overlay_number_settings(data)
+      end
+
+      @dialog_settings.add_action_callback("load_overlay_bldg_settings") do
+        settings = self.get_overlay_bldg_settings
+        @dialog_settings.execute_script("renderOverlayBldgSettings(#{settings.to_json})")
+      end
+
+      @dialog_settings.add_action_callback("save_overlay_bldg_settings") do |_, json_str|
+        data = JSON.parse(json_str)
+        self.save_overlay_bldg_settings(data)
       end
 
       @dialog_settings.add_action_callback("load_reduction_settings") do
@@ -272,6 +327,7 @@ module CiviscopeLayout
         colors: self.get_custom_colors,
         fallback_colors: COLOR_MAP,
         stats_size: self.get_stats_size,
+        stats_pos: self.get_stats_pos,
         overlay_height: self.get_overlay_number_settings["height"]
       }
 

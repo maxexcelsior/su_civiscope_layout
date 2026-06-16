@@ -86,9 +86,12 @@ module CiviscopeLayout
       settings = get_overlay_number_settings
       if settings["use_height_limit"] && site
         height_limit = site.get_attribute("dynamic_attributes", "height_limit").to_f
-        height_m = height_limit > 0 ? height_limit + 10.0 : (settings["height"] || 2.0).to_f
-      else
+        offset = settings["height_offset"].to_f
+        height_m = height_limit > 0 ? height_limit + offset : (settings["height"] || 2.0).to_f
+      elsif settings["use_fixed_height"]
         height_m = (settings["height"] || 2.0).to_f
+      else
+        height_m = 2.0
       end
 
       # 标签创建在与 site 相同的容器内
@@ -187,6 +190,159 @@ module CiviscopeLayout
 
       # 从 definition 局部空间转换到父容器空间（通过 site 自身的变换）
       local_center.transform(site.transformation)
+    end
+
+    # ==========================================
+    # 建筑编号显示
+    # ==========================================
+
+    unless defined?(BLDG_LABEL_LAYER_NAME)
+      BLDG_LABEL_LAYER_NAME = "TX-建筑编号".freeze
+    end
+    unless defined?(BLDG_LABEL_ATTR_KEY)
+      BLDG_LABEL_ATTR_KEY = "civiscope_bldg_number_label".freeze
+    end
+
+    def self.ensure_bldg_number_overlay(model)
+      cleanup_orphaned_bldg_labels(model)
+    end
+
+    def self.cleanup_orphaned_bldg_labels(model)
+      scan_for_labels(model.entities).each do |t|
+        t.erase! if t.get_attribute("dynamic_attributes", BLDG_LABEL_ATTR_KEY)
+      end
+    rescue => e
+    end
+
+    def self.toggle_bldg_number(id_str)
+      model = Sketchup.active_model
+      bldg = model.find_entity_by_persistent_id(id_str.to_i)
+      bldg ||= model.entities.to_a.find { |e| self.get_short_id(e) == id_str }
+      return unless bldg
+
+      @bldg_number_labels ||= {}
+
+      if @bldg_number_labels.key?(id_str)
+        remove_bldg_number_label(id_str)
+      else
+        remove_orphaned_bldg_label_for(id_str)
+
+        center = compute_bldg_center_at_base(bldg)
+        return unless center
+
+        number = bldg.get_attribute("dynamic_attributes", "bldg_no") || ""
+        return if number.empty?
+
+        create_bldg_number_label(id_str, center, number, bldg)
+      end
+
+      model.active_view.refresh
+      self.refresh_stats_ui(model.selection)
+    end
+
+    def self.cancel_all_bldg_numbers
+      return unless @bldg_number_labels
+      @bldg_number_labels.keys.each { |id_str| remove_bldg_number_label(id_str) }
+      @bldg_number_labels = {}
+      Sketchup.active_model.active_view.refresh
+    end
+
+    def self.get_or_create_bldg_label_layer(model)
+      layer = model.layers[BLDG_LABEL_LAYER_NAME]
+      unless layer
+        layer = model.layers.add(BLDG_LABEL_LAYER_NAME)
+      end
+      layer
+    end
+
+    # 计算建筑标签高度（米）
+    # 裙楼：使用总高度（裙楼高度）+ 偏移
+    # 塔楼/独立：使用建筑真高（有效高度）+ 偏移
+    def self.compute_bldg_label_height(building)
+      bldg_type = building.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+      settings = get_overlay_bldg_settings
+      offset = settings["offset"].to_f
+
+      own_th = building.get_attribute("dynamic_attributes", "total_height").to_f
+
+      if bldg_type == "裙楼"
+        height_m = own_th
+      else  # 塔楼 or 独立
+        height_m = self.compute_effective_h(building, bldg_type, own_th)
+      end
+
+      height_m = height_m > 0 ? height_m : 10.0
+      height_m + offset
+    end
+
+    # 计算建筑底部中心点（父容器局部坐标）
+    # compute_site_center 对体块会返回中部高度（顶部+底部面的平均z）
+    # 此处修正为建筑基底 z，确保标签从建筑根部向上偏移
+    def self.compute_bldg_center_at_base(building)
+      center = compute_site_center(building)
+      return nil unless center
+
+      definition = building.is_a?(Sketchup::Group) ? building.definition : (building.respond_to?(:definition) ? building.definition : nil)
+      return center unless definition
+
+      bounds = definition.bounds
+      base_pt = Geom::Point3d.new(0, 0, bounds.min.z).transform(building.transformation)
+      Geom::Point3d.new(center.x, center.y, base_pt.z)
+    end
+
+    def self.create_bldg_number_label(id_str, center, number, building)
+      model = Sketchup.active_model
+      height_m = self.compute_bldg_label_height(building)
+
+      # 标签创建在与 building 相同的容器内
+      if building
+        parent = building.parent
+        if parent.is_a?(Sketchup::Entities)
+          target_entities = parent
+        elsif parent.respond_to?(:entities)
+          target_entities = parent.entities
+        else
+          target_entities = model.entities
+        end
+      else
+        target_entities = model.entities
+      end
+
+      pt = center.offset([0, 0, height_m / 0.0254])
+      layer = get_or_create_bldg_label_layer(model)
+
+      text_ent = target_entities.add_text(number, pt)
+      text_ent.layer = layer
+      text_ent.set_attribute("dynamic_attributes", BLDG_LABEL_ATTR_KEY, id_str)
+
+      @bldg_number_labels ||= {}
+      @bldg_number_labels[id_str] = text_ent
+    end
+
+    def self.remove_bldg_number_label(id_str)
+      text_ent = @bldg_number_labels&.delete(id_str)
+      return unless text_ent && text_ent.valid?
+
+      begin
+        text_ent.erase!
+      rescue => e
+        puts "[Civiscope] Failed to remove bldg label: #{e.message}"
+      end
+    end
+
+    def self.remove_orphaned_bldg_label_for(id_str)
+      model = Sketchup.active_model
+      scan_for_labels(model.entities).each do |t|
+        if t.get_attribute("dynamic_attributes", BLDG_LABEL_ATTR_KEY) == id_str
+          t.erase!
+          return
+        end
+      end
+    rescue => e
+    end
+
+    def self.bldg_number_visible?(id_str)
+      @bldg_number_labels&.key?(id_str) || false
     end
 
   end

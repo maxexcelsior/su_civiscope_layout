@@ -152,15 +152,12 @@ module CiviscopeLayout
     end
 
     def self.auto_recalculate(entity, skip_ui_refresh = false, skip_operation = false)
-      eid = get_short_id(entity) rescue '?'
-      puts "[DEBUG-FL] auto_recalculate ENTER entity=#{eid} valid=#{entity.valid?} skip_ui=#{skip_ui_refresh} skip_op=#{skip_operation}"
       @pending_recalc_entity = nil
       UI.stop_timer(@safety_timer_id) if @safety_timer_id
       @safety_timer_id = nil
       return unless entity.valid?
 
       if entity.get_attribute("dynamic_attributes", "bldg_func")
-        puts "[DEBUG-FL] auto_recalculate → calc_bldg_data for bldg_func=#{entity.get_attribute("dynamic_attributes", "bldg_func")}"
         bldg_func = entity.get_attribute("dynamic_attributes", "bldg_func")
         self.apply_material(entity, bldg_func)
         self.calc_bldg_data(entity, skip_operation)

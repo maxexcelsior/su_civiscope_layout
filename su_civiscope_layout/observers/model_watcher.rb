@@ -26,12 +26,8 @@ module CiviscopeLayout
       end
 
       def onTransactionCommit(model)
-        skip = CiviscopeLayout::Core.skip_recalc
-        puts "[DEBUG-FL] ModelWatcher#onTransactionCommit skip_recalc=#{skip}"
-        return if skip
-        puts "[DEBUG-FL] ModelWatcher#onTransactionCommit → starting 0.15s flush timer"
+        return if CiviscopeLayout::Core.skip_recalc
         UI.start_timer(0.15, false) do
-          puts "[DEBUG-FL] ModelWatcher COMMIT-TIMER fired → flush_pending_recalc"
           CiviscopeLayout::Core.flush_pending_recalc
         end
       end

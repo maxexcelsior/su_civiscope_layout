@@ -1,6 +1,6 @@
 {
-  "stats_width": 401,
-  "stats_height": 760,
+  "stats_width": 444,
+  "stats_height": 782,
   "picker_bldg_filter": {
     "func": true,
     "floor_height": true,
@@ -15,8 +15,9 @@
     "体育"
   ],
   "custom_colors": {
-    "建设用地": "#E3DAC3",
-    "体育": "#96DBC9"
+    "建设用地": "#DEC9A9",
+    "体育": "#96DBC9",
+    "办公": "#5D05A6"
   },
   "overlay_number_color": "#ff0a0a",
   "overlay_number_size": 31,
@@ -78,5 +79,10 @@
       500,
       0.7
     ]
-  ]
+  ],
+  "stats_pos_x": 200,
+  "stats_pos_y": 200,
+  "overlay_height_offset": 20.0,
+  "overlay_use_fixed_height": false,
+  "bldg_overlay_offset": 20.0
 }
