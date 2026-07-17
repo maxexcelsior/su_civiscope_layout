@@ -318,19 +318,25 @@ SOFTWARE.
 
 ***联系作者：MaxExcelsior***
 
-<img src="su_civiscope_layout/assets/个人微信.png" width="300" style="margin-bottom: 50px;">
+<img src="su_civiscope_layout/assets/个人微信.png" width="300">
+
+<br><br>
 
 ***公众号：城析万相 Civiscope***
 
-<img src="su_civiscope_layout/assets/公众号二维码.jpg" width="300" style="margin-bottom: 50px;">
+<img src="su_civiscope_layout/assets/公众号二维码.jpg" width="300">
+
+<br><br>
 
 ***小红书：城析万相***
 
-<img src="su_civiscope_layout/assets/城析万相小红书二维码.png" width="300" style="margin-bottom: 50px;">
+<img src="su_civiscope_layout/assets/城析万相小红书二维码.png" width="300">
+
+<br><br>
 
 ***请我喝杯咖啡***
 
-<img src="su_civiscope_layout/assets/个人收款码.jpg" width="300" style="margin-bottom: 50px;">
+<img src="su_civiscope_layout/assets/个人收款码.jpg" width="300">
 
 </div>
 
