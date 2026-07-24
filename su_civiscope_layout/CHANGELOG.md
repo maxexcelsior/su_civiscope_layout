@@ -1,5 +1,58 @@
 # 更新日志
 
+### 2026-07-23
+
+## [0.1.8-beta] - 2026-07-23
+
+### 新增功能 ✨
+
+- **多选地块 UI 优化** (`ui/ui_stats.html`, `ui/stats_dialog.rb`, `render/site_number_overlay.rb`)
+
+  - 标题"选择地块汇总对比"改为"选中地块及数据汇总"
+  - 移除表格中每行的编号显示/隐藏按钮，改为标题右侧的批量"显示地块编号/隐藏地块编号"按钮
+  - 新增 `batch_toggle_site_number` 方法，支持批量切换地块编号显示
+- **Group 多 CIM 实体检测** (`logic/stats_engine.rb`)
+
+  - 选中不含 CIM 属性但内部包含多个 CIM 地块/建筑的普通 Group 时，统计中心切换到用地标签并展示多地块汇总
+  - `get_active_targets` 改为返回 Group 内所有地块而非仅第一个
+
+### 优化改进 🔧
+
+- **统计面板 UI 细节调整** (`ui/ui_stats.html`)
+
+  - 多选地块表头：`性质`→`用地性质`，`面积`→`用地面积(m²)`，`计容`→`计容建筑面积(m²)`，`折减后计容`→`折减后(m²)`
+  - 行标签改为显示用地性质（`site_func`）而非用地大类（`site_type`）
+  - 表头和单元格文字居中对齐
+  - 批量显示/隐藏按钮样式与单选按钮一致
+- **修复批量显示按钮闪烁** (`render/site_number_overlay.rb`)
+
+  - `batch_toggle_site_number` 移除 `start_operation/commit_operation` 包裹，避免 `add_text` 在操作内创建导致实体失效的问题
+
+### 2026-07-22
+
+## [0.1.7-beta] - 2026-07-22
+
+### 新增功能 ✨
+
+- **新增"公寓"建筑功能** (`main.rb`)
+
+  - `DEFAULT_BLDG_FUNCS` 中增加"公寓"
+  - `COLOR_MAP` 中增加 `#ff7f00`（橙色）
+- **颜色选择器"恢复默认"** (`settings.rb`, `ui/ui_settings.html`)
+
+  - 颜色弹窗增加"恢复默认"按钮（红色边框样式）
+  - 点击后删除 `custom_colors` 记录，恢复为 `COLOR_MAP` 默认色
+  - 自动更新模型中对应材质颜色
+  - 仅在存在自定义颜色或 COLOR_MAP 默认色时显示该按钮
+
+### 优化改进 🔧
+
+- **统计中心多选地块汇总增强** (`ui/stats_dialog.rb`, `ui/ui_stats.html`)
+
+  - 多选地块时汇总行新增"总计容建筑面积"和"总计容建筑面积（折减后）"
+  - 各地块行的"折减后计容"列从 `-` 占位符改为显示实际计算值
+  - 修复 `multi_reduction_enabled` 对地块类型始终为 `false` 的问题，折减功能现可正确作用于地块汇总
+
 ### 2026-06-16
 
 ## [0.1.6-beta] - 2026-06-16

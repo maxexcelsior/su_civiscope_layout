@@ -31,9 +31,9 @@ module CiviscopeLayout
           inner_cim = self.collect_cim_entities(ent)
           if inner_cim.any?
             @nested_bp_warning = true if self.detect_nesting?(ent)
-            site = inner_cim.find { |e| e.get_attribute("dynamic_attributes", "site_func") }
-            if site
-              processed_targets << site
+            sites = inner_cim.select { |e| e.get_attribute("dynamic_attributes", "site_func") }
+            if sites.any?
+              processed_targets.concat(sites)
             else
               processed_targets += inner_cim.select { |e| e.get_attribute("dynamic_attributes", "bldg_func") }
             end
@@ -70,7 +70,7 @@ module CiviscopeLayout
     def self.find_buildings_on_site(site)
       model = Sketchup.active_model
       all_bldgs = []
-      
+
       # 1. First, check siblings (most common for BP Groups)
       if site.parent && site.parent.respond_to?(:entities)
         site.parent.entities.each do |e|
@@ -78,7 +78,7 @@ module CiviscopeLayout
           all_bldgs << e if e.get_attribute("dynamic_attributes", "bldg_func")
         end
       end
-      
+
       # 2. Also check model root (just in case)
       model.entities.each do |e|
         next unless e.is_a?(Sketchup::Group) || e.is_a?(Sketchup::ComponentInstance)
@@ -92,7 +92,7 @@ module CiviscopeLayout
         b_tr = CiviscopeLayout::Core.get_full_world_transform(bldg)
         local_bottom_center = Geom::Point3d.new(bldg.definition.bounds.center.x, bldg.definition.bounds.center.y, bldg.definition.bounds.min.z)
         world_bottom_center = local_bottom_center.transform(b_tr)
-        
+
         if self.point_in_site_vertical?(world_bottom_center, site)
           on_site_ents << bldg
         end
@@ -100,12 +100,13 @@ module CiviscopeLayout
       on_site_ents
     end
 
-    def self.format_bldg_data(entities)
+    def self.format_bldg_data(entities, height_cache = nil)
       reduction_enabled = CiviscopeLayout::Core.get_reduction_settings['enabled']
       entities.map do |b|
         bldg_type = b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
         area = b.get_attribute("dynamic_attributes", "bldg_area").to_f.round(2)
-        h_for_reduction = CiviscopeLayout::Core.get_height_for_reduction(b)
+        b_id = self.get_short_id(b)
+        h_for_reduction = height_cache ? height_cache[b_id] : CiviscopeLayout::Core.get_height_for_reduction(b)
         factor = CiviscopeLayout::Core.compute_reduction_factor(bldg_type, h_for_reduction)
         reduced_area = (area * factor).round(2)
         {

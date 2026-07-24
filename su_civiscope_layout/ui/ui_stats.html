@@ -745,19 +745,21 @@
     </div>
 
     <div id="site-multi" class="view-box card">
-      <div class="title" style="border-left-color: #28a745;">选中地块汇总对比</div>
+      <div class="title" style="border-left-color: #28a745; display:flex; align-items:center; justify-content:space-between;">
+  选中地块及数据汇总
+  <button id="btn-batch-site-number" class="toolbar-btn" style="flex:none; padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="batchToggleSiteNumber()">显示地块编号</button>
+</div>
       <table class="multi-table" style="font-size: 10px;">
         <thead>
           <tr>
-            <th style="text-align:left;">编号</th>
-            <th style="text-align:left;">性质</th>
-            <th style="text-align:right;">面积</th>
-            <th style="text-align:right;">计容</th>
-            <th id="site-multi-reduced-gfa-th" style="text-align:right; display:none;">折减后计容</th>
-            <th style="text-align:right;">容积率</th>
-            <th style="text-align:right;">密度</th>
-            <th style="text-align:right;">绿地率</th>
-            <th style="text-align:center;">显示</th>
+            <th style="text-align:center;">编号</th>
+            <th style="text-align:center;">用地性质</th>
+            <th style="text-align:center;">用地面积<br>(m²)</th>
+            <th style="text-align:center;">计容建筑面积<br>(m²)</th>
+            <th id="site-multi-reduced-gfa-th" style="text-align:center; display:none;">折减后(m²)</th>
+            <th style="text-align:center;">容积率</th>
+            <th style="text-align:center;">密度</th>
+            <th style="text-align:center;">绿地率</th>
           </tr>
         </thead>
         <tbody id="site-list"></tbody>
@@ -765,6 +767,14 @@
       <div class="row" style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
         <span style="font-weight:bold; font-size:14px;">总用地面积：</span>
         <span class="highlight" style="color: #28a745;"><span id="site-total">0.00</span> m²</span>
+      </div>
+      <div class="row" id="site-total-gfa-row" style="display:none;">
+        <span style="font-weight:bold; font-size:14px;">总计容建筑面积：</span>
+        <span class="highlight" style="color: #28a745;"><span id="site-total-gfa">0.00</span> m²</span>
+      </div>
+      <div class="row" id="site-total-reduced-gfa-row" style="display:none;">
+        <span style="font-weight:bold; font-size:14px;">总计容建筑面积（折减后）：</span>
+        <span class="highlight" style="color: #ff9800;"><span id="site-total-reduced-gfa">0.00</span> m²</span>
       </div>
     </div>
   </div>
@@ -1020,6 +1030,14 @@
       }
       sketchup.toggle_site_number(idStr);
     }
+    function batchToggleSiteNumber() {
+      var btn = document.getElementById('btn-batch-site-number');
+      if (!btn || !window._currentMultiSiteIds || window._currentMultiSiteIds.length === 0) return;
+      var showing = btn.innerText === '隐藏地块编号';
+      btn.innerText = showing ? '显示地块编号' : '隐藏地块编号';
+      if (showing) btn.classList.remove('active'); else btn.classList.add('active');
+      sketchup.batch_toggle_site_number(JSON.stringify(window._currentMultiSiteIds));
+    }
     function toggleBldgNumber() {
       let idStr = document.getElementById('bldg-id').innerText.replace("ID: ", "").trim();
       let btn = document.getElementById('btn-bldg-show-number');
@@ -1270,7 +1288,7 @@
           if (data.list) {
             data.list.forEach(item => {
               let displayNo = item.no ? item.no : "<span style='color:#aaa;'>无</span>";
-              let label = type === 'bldg' ? item.f : item.t;
+              var label = item.f;
               if (type === 'bldg') {
                 listHtml += `<tr><td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td><td>${label}</td><td style="text-align:right; font-weight:bold;">${item.area}</td>`;
                 if (data.reduction_enabled) {
@@ -1279,17 +1297,16 @@
                 listHtml += `</tr>`;
               } else {
                 listHtml += `<tr>
-                  <td style="text-align:left; color:#0056b3; font-weight:bold;">${displayNo}</td>
-                  <td style="font-size:10px;">${label}</td>
-                  <td style="text-align:right;">${item.area}</td>
-                  <td style="text-align:right; color:#28a745; font-weight:bold;">${item.gfa}</td>`;
+                  <td style="text-align:center; color:#0056b3; font-weight:bold;">${displayNo}</td>
+                  <td style="text-align:center; font-size:10px;">${label}</td>
+                  <td style="text-align:center;">${item.area}</td>
+                  <td style="text-align:center; color:#28a745; font-weight:bold;">${item.gfa}</td>`;
                 if (data.reduction_enabled) {
-                  listHtml += `<td style="text-align:right; color:#ff9800; font-weight:bold;">-</td>`;
+                  listHtml += `<td style="text-align:center; color:#ff9800; font-weight:bold;">${parseFloat(item.reduced_gfa || 0).toFixed(2)}</td>`;
                 }
-                listHtml += `<td style="text-align:right;">${item.far}</td>
-                  <td style="text-align:right;">${item.density}%</td>
-                  <td style="text-align:right; color:#388e3c;">${item.green_rate}%</td>
-                  <td style="text-align:center;"><button class="toolbar-btn" style="padding:0 6px; font-size:10px;" onclick="toggleSiteNumber('${item.id}', this)">${item.is_showing_number ? '隐藏' : '显示'}</button></td>
+                listHtml += `<td style="text-align:center;">${item.far}</td>
+                  <td style="text-align:center;">${item.density}%</td>
+                  <td style="text-align:center; color:#388e3c;">${item.green_rate}%</td>
                 </tr>`;
               }
             });
@@ -1340,6 +1357,32 @@
             var siteMultiReducedTh = document.getElementById('site-multi-reduced-gfa-th');
             if (siteMultiReducedTh) {
               siteMultiReducedTh.style.display = data.reduction_enabled ? '' : 'none';
+            }
+            // Site multi total GFA rows
+            var totalGfaRow = document.getElementById('site-total-gfa-row');
+            var totalGfaEl = document.getElementById('site-total-gfa');
+            if (totalGfaRow && data.totalGfa != null) {
+              totalGfaRow.style.display = 'flex';
+              document.getElementById('site-total-gfa').innerText = parseFloat(data.totalGfa || 0).toFixed(2);
+            } else if (totalGfaRow) {
+              totalGfaRow.style.display = 'none';
+            }
+            var totalReducedGfaRow = document.getElementById('site-total-reduced-gfa-row');
+            if (totalReducedGfaRow && data.reduction_enabled && data.totalReducedGfa != null) {
+              totalReducedGfaRow.style.display = 'flex';
+              document.getElementById('site-total-reduced-gfa').innerText = parseFloat(data.totalReducedGfa || 0).toFixed(2);
+            } else if (totalReducedGfaRow) {
+              totalReducedGfaRow.style.display = 'none';
+            }
+            // 保存站点 ID 列表用于批量切换
+            if (data.list) {
+              window._currentMultiSiteIds = data.list.map(item => item.id);
+              var batchBtn = document.getElementById('btn-batch-site-number');
+              if (batchBtn) {
+                var allShowing = data.list.every(function(item) { return item.is_showing_number; });
+                batchBtn.innerText = allShowing ? '隐藏地块编号' : '显示地块编号';
+                if (allShowing) batchBtn.classList.add('active'); else batchBtn.classList.remove('active');
+              }
             }
           }
         }

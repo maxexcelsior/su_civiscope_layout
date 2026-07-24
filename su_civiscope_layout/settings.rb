@@ -256,15 +256,32 @@ module CiviscopeLayout
         colors = self.get_custom_colors
         colors[name] = hex
         self.save_custom_colors(colors)
-        
+
         # 自动更新现存材质实体
         mat_name = "Civiscope_#{name}"
         mat = Sketchup.active_model.materials[mat_name]
         if mat
           mat.color = hex
         end
-        
+
         self.refresh_stats_ui(Sketchup.active_model.selection)
+      end
+
+      @dialog_settings.add_action_callback("reset_color") do |_, name|
+        colors = self.get_custom_colors
+        if colors.delete(name)
+          self.save_custom_colors(colors)
+          # 恢复材质为 COLOR_MAP 默认颜色
+          mat_name = "Civiscope_#{name}"
+          mat = Sketchup.active_model.materials[mat_name]
+          if mat
+            default_rgb = COLOR_MAP[name]
+            if default_rgb
+              mat.color = default_rgb
+            end
+          end
+          self.refresh_stats_ui(Sketchup.active_model.selection)
+        end
       end
 
       @dialog_settings.add_action_callback("update_stats_size") do |_, w, h|

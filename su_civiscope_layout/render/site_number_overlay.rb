@@ -63,6 +63,36 @@ module CiviscopeLayout
       self.refresh_stats_ui(model.selection)
     end
 
+    def self.batch_toggle_site_number(ids_json)
+      ids = JSON.parse(ids_json)
+      return if ids.empty?
+      @site_number_labels ||= {}
+      any_visible = ids.any? { |id| @site_number_labels.key?(id) }
+      model = Sketchup.active_model
+
+      # Note: Cannot wrap add_text inside start_operation/commit_operation
+      # (text entities become DeletedEntity). Each erase!/add_text creates its
+      # own undo step, which is acceptable for this batch operation.
+      ids.each do |id_str|
+        if any_visible && @site_number_labels.key?(id_str)
+          remove_site_number_label(id_str)
+        elsif !any_visible
+          site = model.find_entity_by_persistent_id(id_str.to_i)
+          site ||= model.entities.to_a.find { |e| self.get_short_id(e) == id_str }
+          next unless site
+          remove_orphaned_label_for(id_str)
+          center = compute_site_center(site)
+          next unless center
+          number = site.get_attribute("dynamic_attributes", "site_no") || ""
+          next if number.empty?
+          create_site_number_label(id_str, center, number, site)
+        end
+      end
+
+      model.active_view.refresh
+      self.refresh_stats_ui(model.selection)
+    end
+
     def self.cancel_all_site_numbers
       return unless @site_number_labels
       @site_number_labels.keys.each { |id_str| remove_site_number_label(id_str) }

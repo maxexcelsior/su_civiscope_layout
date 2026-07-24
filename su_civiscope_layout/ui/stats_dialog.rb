@@ -65,6 +65,7 @@ module CiviscopeLayout
       end
       @dialog_stats.add_action_callback("toggle_height_check") { |_, id| self.do_toggle_height_check(id) }
       @dialog_stats.add_action_callback("toggle_site_number") { |_, id| self.toggle_site_number(id) }
+      @dialog_stats.add_action_callback("batch_toggle_site_number") { |_, ids_json| self.batch_toggle_site_number(ids_json) }
       @dialog_stats.add_action_callback("toggle_bldg_number") { |_, id| self.toggle_bldg_number(id) }
       @dialog_stats.add_action_callback("set_all_height_checks") { |_, status| self.do_set_all_height_checks(status) }
       @dialog_stats.add_action_callback("start_picker") { |_, mode| Sketchup.active_model.select_tool(FunctionPickerTool.new(mode)) }
@@ -178,6 +179,10 @@ module CiviscopeLayout
           bldg_ents = self.find_buildings_on_site(t)
           t_gfa, t_footprint, t_green = self.calculate_site_metrics(t, bldg_ents)
 
+          # 预计算每栋建筑的有效高度（缓存避免重复调用 find_podiums_under_tower）
+          height_cache = {}
+          bldg_ents.each { |b| height_cache[self.get_short_id(b)] = self.get_height_for_reduction(b) }
+
           site_area = t.get_attribute("dynamic_attributes", "site_area").to_f
           site_area = site_area > 0 ? site_area : 0.001
 
@@ -187,7 +192,7 @@ module CiviscopeLayout
           bldg_ents.each do |b|
             b_area = b.get_attribute("dynamic_attributes", "bldg_area").to_f
             b_type = b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
-            h_for_r = self.get_height_for_reduction(b)
+            h_for_r = height_cache[self.get_short_id(b)]
             factor = self.compute_reduction_factor(b_type, h_for_r)
             t_reduced_gfa += (b_area * factor).round(2)
           end
@@ -203,7 +208,7 @@ module CiviscopeLayout
             f: t.get_attribute("dynamic_attributes", "site_func"),
             area: t.get_attribute("dynamic_attributes", "site_area"),
             hl: t.get_attribute("dynamic_attributes", "height_limit") || "0",
-            bldgs: self.format_bldg_data(bldg_ents),
+            bldgs: self.format_bldg_data(bldg_ents, height_cache),
             bldg_funcs: bldg_funcs,  # 传递建筑功能列表
             gfa: t_gfa,
             far: (t_gfa / site_area).round(2),
@@ -223,6 +228,8 @@ module CiviscopeLayout
         # Multi-select mode
         list_data = []
         total_area = 0.0
+        total_gfa = 0.0
+        total_reduced_gfa = 0.0
         reduction_enabled = self.get_reduction_settings['enabled']
         reduced_total_area = 0.0
         valid_targets.each do |t|
@@ -254,14 +261,29 @@ module CiviscopeLayout
             item[:density] = ((t_footprint / site_area) * 100).round(1)
             item[:green_rate] = ((t_green / site_area) * 100).round(1)
             item[:is_showing_number] = self.site_number_visible?(self.get_short_id(t))
+            total_gfa += t_gfa
+            if reduction_enabled
+              t_reduced_gfa = 0.0
+              bldg_ents.each do |b|
+                b_area = b.get_attribute("dynamic_attributes", "bldg_area").to_f
+                b_type = b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+                h_for_r = self.get_height_for_reduction(b)
+                factor = self.compute_reduction_factor(b_type, h_for_r)
+                t_reduced_gfa += (b_area * factor).round(2)
+              end
+              total_reduced_gfa += t_reduced_gfa
+              item[:reduced_gfa] = t_reduced_gfa.round(2)
+            end
           end
           list_data << item
         end
         has_global_hl = @overlay && !@overlay.sites_data.empty?
-        multi_reduction_enabled = type == 'bldg' ? reduction_enabled : false
+        multi_reduction_enabled = reduction_enabled
         multi_data = {
           list: list_data,
           totalArea: total_area,
+          totalGfa: type == 'site' ? total_gfa.round(2) : nil,
+          totalReducedGfa: (type == 'site' && multi_reduction_enabled) ? total_reduced_gfa.round(2) : nil,
           reducedTotalArea: multi_reduction_enabled ? reduced_total_area : nil,
           reduction_enabled: multi_reduction_enabled,
           global_hl_on: has_global_hl

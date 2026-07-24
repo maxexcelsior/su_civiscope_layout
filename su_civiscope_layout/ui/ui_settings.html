@@ -50,6 +50,8 @@
     .cp-btn.primary:hover { background: #004494; }
     .cp-btn.secondary { background: #f0f0f0; color: #333; }
     .cp-btn.secondary:hover { background: #e0e0e0; }
+    .cp-btn.reset { background: transparent; color: #dc3545; border: 1px solid #dc3545; font-size: 11px; }
+    .cp-btn.reset:hover { background: #dc3545; color: white; }
   </style>
 </head>
 <body>
@@ -251,6 +253,7 @@
     </div>
 
     <div class="cp-actions">
+      <button class="cp-btn reset" id="cp-reset-btn" onclick="cpResetDefault()">恢复默认</button>
       <button class="cp-btn primary" onclick="cpSave()">应用新色</button>
       <button class="cp-btn secondary" onclick="cpClose()">取消</button>
     </div>
@@ -471,16 +474,24 @@
       currentEditingName = name;
       currentEditingPrefix = prefix;
       oldColorHex = currentHex;
-      
+
       document.getElementById('cp-preview-old').style.background = oldColorHex;
       updateSliders(currentHex);
 
+      // 切换恢复默认按钮的显示状态
+      var resetBtn = document.getElementById('cp-reset-btn');
+      if (resetBtn && currentPayload) {
+        var hasCustomColor = currentPayload.colors && currentPayload.colors.hasOwnProperty(name);
+        var hasDefault = currentPayload.fallback_colors && currentPayload.fallback_colors.hasOwnProperty(name);
+        resetBtn.style.display = (hasCustomColor || hasDefault) ? '' : 'none';
+      }
+
       let pop = document.getElementById('color-popover');
       let rect = btnElement.getBoundingClientRect();
-      
+
       let topPos = rect.bottom + 10;
       let leftPos = rect.left;
-      
+
       if(leftPos + 240 > window.innerWidth) leftPos = window.innerWidth - 260;
       if(topPos + 260 > window.innerHeight) topPos = rect.top - 270;
 
@@ -502,6 +513,33 @@
       let box = document.getElementById(`cbox_${currentEditingPrefix}_${encodeURIComponent(currentEditingName)}`);
       if(box) box.style.background = currentColorHex;
       
+      cpClose();
+    }
+
+    function cpResetDefault() {
+      if(!currentEditingName) return;
+
+      var defaultHex = null;
+      // 优先从 COLOR_MAP 中寻找默认颜色
+      if (currentPayload && currentPayload.fallback_colors && currentPayload.fallback_colors[currentEditingName]) {
+        var cr = currentPayload.fallback_colors[currentEditingName];
+        defaultHex = rgbToHexNative(cr[0], cr[1], cr[2]);
+      }
+
+      // 调用 Ruby 移除自定义颜色记录
+      sketchup.reset_color(currentEditingName);
+
+      // 更新本地 payload
+      if (currentPayload && currentPayload.colors) {
+        delete currentPayload.colors[currentEditingName];
+      }
+
+      // 更新色块显示
+      var box = document.getElementById(`cbox_${currentEditingPrefix}_${encodeURIComponent(currentEditingName)}`);
+      if (box) {
+        box.style.background = defaultHex || '#C0C0C0';
+      }
+
       cpClose();
     }
     function saveGui() {

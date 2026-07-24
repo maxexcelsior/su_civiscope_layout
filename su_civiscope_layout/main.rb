@@ -9,10 +9,10 @@ module CiviscopeLayout
     # 0. 全局常量与配置中心
     # ==========================================
     PLUGIN_NAME = "Civiscope_Layout" unless defined?(PLUGIN_NAME)
-    VERSION = "0.1.6-beta" unless defined?(VERSION)
+    VERSION = "0.1.8-beta" unless defined?(VERSION)
     AUTHOR = "MaxExcelsior" unless defined?(AUTHOR)
     
-    DEFAULT_BLDG_FUNCS = ["办公", "商业", "居住", "公服设施", "市政设施", "交通设施", "工业", "仓储"] unless defined?(DEFAULT_BLDG_FUNCS)
+    DEFAULT_BLDG_FUNCS = ["办公", "商业", "居住", "公寓", "公服设施", "市政设施", "交通设施", "工业", "仓储"] unless defined?(DEFAULT_BLDG_FUNCS)
     DEFAULT_SITE_FUNCS = ["居住用地", "商业用地", "中小学用地", "绿地与广场用地", "道路与交通用地", "公园绿地", "防护绿地", "广场用地", "水域", "工业用地", "物流用地", "特殊用地"] unless defined?(DEFAULT_SITE_FUNCS)
     SITE_TYPES = ["建设用地", "绿地与广场用地", "水域"] unless defined?(SITE_TYPES)
     
@@ -23,7 +23,7 @@ module CiviscopeLayout
 
     COLOR_MAP = {
       # 建筑颜色
-      "办公" => [221, 5, 166], "商业" => [255, 0, 63], "居住" => [255, 255, 0],
+      "办公" => [221, 5, 166], "商业" => [255, 0, 63], "居住" => [255, 255, 0], "公寓" => [255, 127, 0],
       "公服设施" => [255, 223, 127], "市政设施" => [0, 138, 184], "交通设施" => [144, 144, 144],
       "工业" => [187, 139, 93], "仓储" => [124, 82, 165],
       # 地块颜色

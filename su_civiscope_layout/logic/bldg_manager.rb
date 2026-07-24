@@ -133,52 +133,32 @@ module CiviscopeLayout
       podium_heights = []
 
       entity_world_bottom = self.get_world_z(entity, :bottom)
-      eid = get_short_id(entity) rescue '?'
-      puts "[DEBUG-PODIUM] find_podiums_under_tower entity=#{eid} world_bottom_z=#{entity_world_bottom&.round(4)}"
       return [] if entity_world_bottom.nil?
 
       entity_bb = self.get_world_xy_bounds(entity)
-      puts "[DEBUG-PODIUM] entity_bb=[#{entity_bb.map { |v| v.round(4) }.join(', ')}]"
 
       self.find_sibling_buildings(entity).each do |sibling|
         next if visited.include?(sibling)
         bldg_type = sibling.get_attribute("dynamic_attributes", "bldg_type") || ""
-        next unless bldg_type == "裙楼"  # "裙楼"
+        next unless bldg_type == "裙楼"
 
-        sid = get_short_id(sibling) rescue '?'
         sibling_world_top = self.get_world_z(sibling, :top)
-        puts "[DEBUG-PODIUM]   checking podium=#{sid} world_top_z=#{sibling_world_top&.round(4)}"
         next if sibling_world_top.nil?
 
         vert_diff = (entity_world_bottom - sibling_world_top).abs
-        puts "[DEBUG-PODIUM]     vert_diff=#{vert_diff.round(4)} (need <1.0)"
+        next if vert_diff >= 1.0
 
-        # 垂直匹配：entity 底部 ≈ 裙楼顶部（容差 1m）
-        if vert_diff >= 1.0
-          puts "[DEBUG-PODIUM]     VERTICAL MISMATCH — skipping"
-          next
-        end
-
-        # 水平匹配：塔楼/裙楼的 XY 中心点必须落在裙楼 XY 包围盒内
-        # （比 overlap 更严格，避免相邻裙楼之间的误匹配）
         sibling_bb = self.get_world_xy_bounds(sibling)
         entity_center_x = (entity_bb[0] + entity_bb[1]) / 2.0
         entity_center_y = (entity_bb[2] + entity_bb[3]) / 2.0
         center_in = entity_center_x >= sibling_bb[0] && entity_center_x <= sibling_bb[1] &&
                     entity_center_y >= sibling_bb[2] && entity_center_y <= sibling_bb[3]
-        puts "[DEBUG-PODIUM]     sibling_bb=[#{sibling_bb.map { |v| v.round(4) }.join(', ')}] center=(#{entity_center_x.round(2)}, #{entity_center_y.round(2)}) center_in=#{center_in}"
-
-        unless center_in
-          puts "[DEBUG-PODIUM]     XY MISMATCH — center not inside podium"
-          next
-        end
+        next unless center_in
 
         podium_th = sibling.get_attribute("dynamic_attributes", "total_height").to_f
-        puts "[DEBUG-PODIUM]     MATCH! adding podium_th=#{podium_th}"
         podium_heights << podium_th
         podium_heights.concat(self.find_podiums_under_tower(sibling, visited))
       end
-      puts "[DEBUG-PODIUM] result podium_heights=#{podium_heights.inspect} sum=#{podium_heights.sum}"
       podium_heights
     end
 
@@ -248,11 +228,12 @@ module CiviscopeLayout
 
     def self.remove_roof_structure(entity)
       model = Sketchup.active_model
+      definition = entity.is_a?(Sketchup::Group) ? entity.definition : entity.definition
 
       roof_id_str = entity.get_attribute("civiscope", "roof_structure_id")
       if roof_id_str
         roof = model.find_entity_by_persistent_id(roof_id_str.to_i) rescue nil
-        if roof && roof.valid?
+        if roof && roof.valid? && roof.parent == definition
           roof.erase!
           entity.set_attribute("civiscope", "roof_structure_id", nil)
           return true
@@ -260,7 +241,6 @@ module CiviscopeLayout
       end
 
       # 回退：扫描 definition 内部（屋顶构筑物嵌套在建筑 definition 中）
-      definition = entity.is_a?(Sketchup::Group) ? entity.definition : entity.definition
       if definition
         old = definition.entities.grep(Sketchup::Group).select { |g|
           g.get_attribute("civiscope", "is_roof_structure")
@@ -357,34 +337,55 @@ module CiviscopeLayout
 
       # 读取缩进距离
       rs_mode = entity.get_attribute("dynamic_attributes", "roof_structure_mode")
-      if rs_mode == 'manual'
+      indent_m = if rs_mode == 'manual'
         manual_indent = entity.get_attribute("dynamic_attributes", "roof_structure_manual_indent").to_f
-        indent_m = manual_indent >= 0 ? manual_indent : 10.0
+        manual_indent >= 0 ? manual_indent : 10.0
       else
-        # 居住建筑自动模式：缩进3m，其他10m
-        bldg_func = entity.get_attribute("dynamic_attributes", "bldg_func")
-        indent_m = bldg_func == '居住' ? 3.0 : 10.0
+        entity.get_attribute("dynamic_attributes", "bldg_func") == '居住' ? 3.0 : 10.0
       end
-      # 使用 XY 平均缩放系数修正缩进，确保缩放体块后缩进值在显示空间保持不变
-      scale_x = entity.transformation.xscale.abs
-      scale_y = entity.transformation.yscale.abs
-      avg_xy_scale = (scale_x + scale_y) / 2.0
-      avg_xy_scale = 1.0 if avg_xy_scale < 0.001
-      offset_inch = (indent_m / 0.0254) / avg_xy_scale
+      # 在世界坐标系中计算偏移，避免非均匀缩放时 offset 失真
+      tr = entity.transformation
+      world_indent = indent_m / 0.0254
 
       top_verts = top_face.outer_loop.vertices.map(&:position)
-      inner_verts = offset_polygon_vertices(top_verts, offset_inch)
-      return if inner_verts.nil? || inner_verts.length < 3
 
+      # 创建屋顶构筑物父群组
       roof_group = ents.add_group
       roof_group.name = "屋顶构筑物"
       roof_group.set_attribute("civiscope", "is_roof_structure", true)
       entity.set_attribute("civiscope", "roof_structure_id", roof_group.persistent_id.to_s)
 
-      inner_face = roof_group.entities.add_face(inner_verts)
-      return unless inner_face
-      inner_face.reverse! if inner_face.normal.z < 0
-      inner_face.pushpull(roof_sh_inch)
+      roof_ents = roof_group.entities
+
+      # ---- 围墙：原屋顶轮廓边线向上挤出 ----
+      wall_group = roof_ents.add_group
+      wall_group.name = "围墙"
+      wall_ents = wall_group.entities
+
+      top_verts.each_with_index do |v, i|
+        j = (i + 1) % top_verts.length
+        v1 = top_verts[i]
+        v2 = top_verts[j]
+        v3 = Geom::Point3d.new(v2.x, v2.y, v2.z + roof_sh_inch)
+        v4 = Geom::Point3d.new(v1.x, v1.y, v1.z + roof_sh_inch)
+        wall_ents.add_face(v1, v2, v3, v4)
+      end
+
+      # ---- 内缩体块：顶面向内偏移后向上挤出 ----
+      world_verts = top_verts.map { |v| v.transform(tr) }
+      world_inner = offset_polygon_vertices(world_verts, world_indent)
+      inner_verts = world_inner ? world_inner.map { |v| v.transform(tr.inverse) } : nil
+      if inner_verts && inner_verts.length >= 3
+        inner_group = roof_ents.add_group
+        inner_group.name = "内缩体块"
+        inner_ents = inner_group.entities
+
+        inner_face = inner_ents.add_face(inner_verts)
+        if inner_face
+          inner_face.reverse! if inner_face.normal.z < 0
+          inner_face.pushpull(roof_sh_inch)
+        end
+      end
     end
 
     def self.calc_bldg_data(entity, skip_operation = false)
