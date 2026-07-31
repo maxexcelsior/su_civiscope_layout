@@ -217,7 +217,10 @@ module CiviscopeLayout
         if @mode == 'bldg'
           # 建筑：功能、层高、类型
           entity.set_attribute("dynamic_attributes", "floor_height", @picked_data[:floor_height]) if @filter['floor_height'] && @picked_data[:floor_height]
-          entity.set_attribute("dynamic_attributes", "bldg_type", @picked_data[:bldg_type]) if @filter['type'] && @picked_data[:bldg_type]
+          if @filter['type'] && @picked_data[:bldg_type]
+            entity.set_attribute("dynamic_attributes", "bldg_type", @picked_data[:bldg_type])
+            CiviscopeLayout::Core.update_bldg_layer(entity)
+          end
         else
           # 地块：性质、大类、限高
           entity.set_attribute("dynamic_attributes", "site_type", @picked_data[:site_type]) if @filter['type'] && @picked_data[:site_type]

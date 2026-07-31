@@ -73,6 +73,7 @@ module CiviscopeLayout
         inst.set_attribute("dynamic_attributes", "bldg_func", f.to_s)
         inst.set_attribute("dynamic_attributes", "bldg_no", no.to_s)
         inst.set_attribute("dynamic_attributes", "bldg_type", type.to_s) if type
+        self.update_bldg_layer(inst) if type
         self.auto_recalculate(inst, true, true)
       end
       self.refresh_stats_ui(model.selection)
@@ -126,11 +127,11 @@ module CiviscopeLayout
         bb1[3] + tolerance < bb2[2] || bb2[3] + tolerance < bb1[2])
     end
 
-    # 递归查找塔楼下方所有裙楼，返回裙楼高度数组
-    def self.find_podiums_under_tower(entity, visited = [])
+    # 递归查找实体下方所有叠放的CIM体块（不限类型），返回高度数组
+    def self.find_buildings_under_entity(entity, visited = [])
       return [] if visited.include?(entity)
       visited << entity
-      podium_heights = []
+      heights = []
 
       entity_world_bottom = self.get_world_z(entity, :bottom)
       return [] if entity_world_bottom.nil?
@@ -139,8 +140,6 @@ module CiviscopeLayout
 
       self.find_sibling_buildings(entity).each do |sibling|
         next if visited.include?(sibling)
-        bldg_type = sibling.get_attribute("dynamic_attributes", "bldg_type") || ""
-        next unless bldg_type == "裙楼"
 
         sibling_world_top = self.get_world_z(sibling, :top)
         next if sibling_world_top.nil?
@@ -155,11 +154,41 @@ module CiviscopeLayout
                     entity_center_y >= sibling_bb[2] && entity_center_y <= sibling_bb[3]
         next unless center_in
 
-        podium_th = sibling.get_attribute("dynamic_attributes", "total_height").to_f
-        podium_heights << podium_th
-        podium_heights.concat(self.find_podiums_under_tower(sibling, visited))
+        th = sibling.get_attribute("dynamic_attributes", "total_height").to_f
+        heights << th
+        heights.concat(self.find_buildings_under_entity(sibling, visited))
       end
-      podium_heights
+      heights
+    end
+
+    # 递归查找堆叠中最顶部的体块（用于获取建筑总高）
+    def self.find_top_of_stack(entity, visited = [])
+      return entity if visited.include?(entity)
+      visited << entity
+
+      entity_world_top = self.get_world_z(entity, :top)
+      entity_bb = self.get_world_xy_bounds(entity)
+
+      self.find_sibling_buildings(entity).each do |sibling|
+        next if visited.include?(sibling)
+
+        sibling_world_bottom = self.get_world_z(sibling, :bottom)
+        next if sibling_world_bottom.nil?
+
+        vert_diff = (sibling_world_bottom - entity_world_top).abs
+        next if vert_diff >= 1.0
+
+        sibling_bb = self.get_world_xy_bounds(sibling)
+        entity_center_x = (entity_bb[0] + entity_bb[1]) / 2.0
+        entity_center_y = (entity_bb[2] + entity_bb[3]) / 2.0
+        center_in = entity_center_x >= sibling_bb[0] && entity_center_x <= sibling_bb[1] &&
+                    entity_center_y >= sibling_bb[2] && entity_center_y <= sibling_bb[3]
+        next unless center_in
+
+        return self.find_top_of_stack(sibling, visited)
+      end
+
+      entity
     end
 
     # 获取用于折减系数查询的高度（塔楼用真高，裙楼/独立用自身高度）
@@ -181,8 +210,8 @@ module CiviscopeLayout
       when "独立"  # "独立"
         own_th
       when "塔楼"  # "塔楼"
-        podium_heights = self.find_podiums_under_tower(entity)
-        own_th + podium_heights.sum
+        heights = self.find_buildings_under_entity(entity)
+        own_th + heights.sum
       else
         own_th
       end
@@ -208,6 +237,27 @@ module CiviscopeLayout
     # 避难层层数
     def self.compute_refuge_floors(h)
       h > 100 ? (h / 50.0).ceil - 1 : 0
+    end
+
+    # 计算单个体块在其堆叠区间内应分配的避难层数
+    # entity: 当前体块, own_th: 体块自身高度, h_effective: 建筑真高（含下方体块）
+    def self.compute_block_refuge_floors(entity, own_th, h_effective)
+      top = self.find_top_of_stack(entity)
+      top_type = top.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+      top_th = top.get_attribute("dynamic_attributes", "total_height").to_f
+      total_height = self.compute_effective_h(top, top_type, top_th)
+
+      return 0 if total_height <= 100
+
+      block_base = h_effective - own_th
+      block_top = h_effective
+      total_segments = (total_height / 50.0).ceil
+      count = 0
+      (1...total_segments).each do |i|
+        pos = 50.0 * i
+        count += 1 if pos > block_base && pos <= block_top
+      end
+      count
     end
 
     # 推拉建筑顶面（正值=向上恢复，负值=向下切除）
@@ -427,7 +477,7 @@ module CiviscopeLayout
 
         h_effective = self.compute_effective_h(entity, bldg_type, th_m)
         roof_sh = self.compute_roof_structure_height(h_effective)
-        refuge_fl = self.compute_refuge_floors(h_effective)
+        refuge_fl = self.compute_block_refuge_floors(entity, th_m, h_effective)
 
         # 手动/自动模式处理
         rs_mode = entity.get_attribute("dynamic_attributes", "roof_structure_mode")
@@ -440,6 +490,11 @@ module CiviscopeLayout
           roof_sh = 5.0 if bldg_func == '居住' && h_effective >= 100
         end
 
+
+        # 非堆叠顶部体块不生成屋顶构筑物
+        unless entity == self.find_top_of_stack(entity)
+          roof_sh = 0
+        end
         has_roof = (bldg_type == "塔楼" || bldg_type == "独立") && roof_sh > 0
 
         physical_floors = th_m > roof_sh ? ((th_m - roof_sh) / fh).floor : 0

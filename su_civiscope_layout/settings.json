@@ -42,47 +42,11 @@
       0.8
     ]
   ],
-  "tower_reduction": [
-    [
-      100,
-      0.95
-    ],
-    [
-      150,
-      0.92
-    ],
-    [
-      200,
-      0.89
-    ],
-    [
-      250,
-      0.86
-    ],
-    [
-      300,
-      0.83
-    ],
-    [
-      350,
-      0.79
-    ],
-    [
-      400,
-      0.76
-    ],
-    [
-      450,
-      0.73
-    ],
-    [
-      500,
-      0.7
-    ]
-  ],
+
   "stats_pos_x": 200,
   "stats_pos_y": 200,
   "overlay_height_offset": 20.0,
   "overlay_use_fixed_height": false,
-  "bldg_overlay_offset": 20.0
+  "bldg_overlay_offset": 20.0,
+  "density_mode": "auto"
 }

@@ -9,7 +9,7 @@ module CiviscopeLayout
     # 0. 全局常量与配置中心
     # ==========================================
     PLUGIN_NAME = "Civiscope_Layout" unless defined?(PLUGIN_NAME)
-    VERSION = "0.1.8-beta" unless defined?(VERSION)
+    VERSION = "0.1.9-beta" unless defined?(VERSION)
     AUTHOR = "MaxExcelsior" unless defined?(AUTHOR)
     
     DEFAULT_BLDG_FUNCS = ["办公", "商业", "居住", "公寓", "公服设施", "市政设施", "交通设施", "工业", "仓储"] unless defined?(DEFAULT_BLDG_FUNCS)

@@ -67,6 +67,7 @@ module CiviscopeLayout
       @dialog_stats.add_action_callback("toggle_site_number") { |_, id| self.toggle_site_number(id) }
       @dialog_stats.add_action_callback("batch_toggle_site_number") { |_, ids_json| self.batch_toggle_site_number(ids_json) }
       @dialog_stats.add_action_callback("toggle_bldg_number") { |_, id| self.toggle_bldg_number(id) }
+      @dialog_stats.add_action_callback("set_density_mode") { |_, mode| self.save_density_mode(mode); self.refresh_stats_ui(Sketchup.active_model.selection) }
       @dialog_stats.add_action_callback("set_all_height_checks") { |_, status| self.do_set_all_height_checks(status) }
       @dialog_stats.add_action_callback("start_picker") { |_, mode| Sketchup.active_model.select_tool(FunctionPickerTool.new(mode)) }
       @dialog_stats.add_action_callback("show_picker_settings") { |_, type| self.show_picker_settings_dialog(type) }
@@ -153,7 +154,7 @@ module CiviscopeLayout
             ba: t.get_attribute("dynamic_attributes", "base_area"),
             area: t.get_attribute("dynamic_attributes", "bldg_area"),
             type: bldg_type,
-            rf: t.get_attribute("dynamic_attributes", "refuge_floors") || "0",
+            rf: self.compute_block_refuge_floors(t, own_th, h_effective).to_s,
             rsh: t.get_attribute("dynamic_attributes", "roof_structure_height") || "0",
             rs_mode: t.get_attribute("dynamic_attributes", "roof_structure_mode") || "auto",
             rs_manual_height: t.get_attribute("dynamic_attributes", "roof_structure_manual_height") || t.get_attribute("dynamic_attributes", "roof_structure_height") || "10",
@@ -179,7 +180,10 @@ module CiviscopeLayout
           bldg_ents = self.find_buildings_on_site(t)
           t_gfa, t_footprint, t_green = self.calculate_site_metrics(t, bldg_ents)
 
-          # 预计算每栋建筑的有效高度（缓存避免重复调用 find_podiums_under_tower）
+          # 自动模式密度：仅统计紧贴地块地面的建筑标准层面积之和
+          auto_base_area = self.compute_auto_base_area(t, bldg_ents)
+
+          # 预计算每栋建筑的有效高度（缓存避免重复调用 find_buildings_under_entity）
           height_cache = {}
           bldg_ents.each { |b| height_cache[self.get_short_id(b)] = self.get_height_for_reduction(b) }
 
@@ -189,12 +193,25 @@ module CiviscopeLayout
           # 折减后 GFA
           reduction_enabled = self.get_reduction_settings['enabled']
           t_reduced_gfa = 0.0
+          t_above_reduced_gfa = 0.0
+          t_below_reduced_gfa = 0.0
+          above_gfa = 0.0
+          below_gfa = 0.0
           bldg_ents.each do |b|
             b_area = b.get_attribute("dynamic_attributes", "bldg_area").to_f
             b_type = b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
             h_for_r = height_cache[self.get_short_id(b)]
             factor = self.compute_reduction_factor(b_type, h_for_r)
-            t_reduced_gfa += (b_area * factor).round(2)
+            reduced = (b_area * factor).round(2)
+            t_reduced_gfa += reduced
+
+            if b_type == '地下空间'
+              below_gfa += b_area
+              t_below_reduced_gfa += reduced
+            else
+              above_gfa += b_area
+              t_above_reduced_gfa += reduced
+            end
           end
           t_reduced_gfa = t_reduced_gfa.round(2)
 
@@ -212,7 +229,10 @@ module CiviscopeLayout
             bldg_funcs: bldg_funcs,  # 传递建筑功能列表
             gfa: t_gfa,
             far: (t_gfa / site_area).round(2),
-            density: ((t_footprint / site_area) * 100).round(1),
+            density_manual: ((t_footprint / site_area) * 100).round(1),
+            density_auto: ((auto_base_area / site_area) * 100).round(1),
+            density_mode: self.get_density_mode,
+            max_bldg_height: bldg_ents.map { |b| self.get_height_for_reduction(b) }.max || 0,
             green_m2: t_green.round(2),
             green_rate: ((t_green / site_area) * 100).round(1),
             is_checking: (@overlay && @overlay.sites_data.key?(site_id)),
@@ -220,7 +240,11 @@ module CiviscopeLayout
             global_hl_on: has_global_hl,
             reduced_gfa: reduction_enabled ? t_reduced_gfa : nil,
             reduced_far: reduction_enabled ? (t_reduced_gfa / site_area).round(2) : nil,
-            reduction_enabled: reduction_enabled
+            reduction_enabled: reduction_enabled,
+            above_gfa: above_gfa.round(2),
+            below_gfa: below_gfa.round(2),
+            above_reduced_gfa: reduction_enabled ? t_above_reduced_gfa.round(2) : nil,
+            below_reduced_gfa: reduction_enabled ? t_below_reduced_gfa.round(2) : nil
           })
           @dialog_stats.execute_script("refreshUI('site', '#{mode}', #{SITE_TYPES.to_json}, #{all_funcs.to_json}, #{data.to_json})")
         end
@@ -230,6 +254,8 @@ module CiviscopeLayout
         total_area = 0.0
         total_gfa = 0.0
         total_reduced_gfa = 0.0
+        total_above_reduced_gfa = 0.0
+        total_below_reduced_gfa = 0.0
         reduction_enabled = self.get_reduction_settings['enabled']
         reduced_total_area = 0.0
         valid_targets.each do |t|
@@ -258,20 +284,31 @@ module CiviscopeLayout
             site_area = area_val > 0 ? area_val : 0.001
             item[:gfa] = t_gfa
             item[:far] = (t_gfa / site_area).round(2)
-            item[:density] = ((t_footprint / site_area) * 100).round(1)
+            item[:density_manual] = ((t_footprint / site_area) * 100).round(1)
+            item[:density_auto] = ((self.compute_auto_base_area(t, bldg_ents) / site_area) * 100).round(1)
             item[:green_rate] = ((t_green / site_area) * 100).round(1)
             item[:is_showing_number] = self.site_number_visible?(self.get_short_id(t))
             total_gfa += t_gfa
             if reduction_enabled
               t_reduced_gfa = 0.0
+              t_above_reduced = 0.0
+              t_below_reduced = 0.0
               bldg_ents.each do |b|
                 b_area = b.get_attribute("dynamic_attributes", "bldg_area").to_f
                 b_type = b.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
                 h_for_r = self.get_height_for_reduction(b)
                 factor = self.compute_reduction_factor(b_type, h_for_r)
-                t_reduced_gfa += (b_area * factor).round(2)
+                reduced = (b_area * factor).round(2)
+                t_reduced_gfa += reduced
+                if b_type == '地下空间'
+                  t_below_reduced += reduced
+                else
+                  t_above_reduced += reduced
+                end
               end
               total_reduced_gfa += t_reduced_gfa
+              total_above_reduced_gfa += t_above_reduced
+              total_below_reduced_gfa += t_below_reduced
               item[:reduced_gfa] = t_reduced_gfa.round(2)
             end
           end
@@ -284,11 +321,14 @@ module CiviscopeLayout
           totalArea: total_area,
           totalGfa: type == 'site' ? total_gfa.round(2) : nil,
           totalReducedGfa: (type == 'site' && multi_reduction_enabled) ? total_reduced_gfa.round(2) : nil,
+          totalAboveReducedGfa: (type == 'site' && multi_reduction_enabled) ? total_above_reduced_gfa.round(2) : nil,
+          totalBelowReducedGfa: (type == 'site' && multi_reduction_enabled) ? total_below_reduced_gfa.round(2) : nil,
           reducedTotalArea: multi_reduction_enabled ? reduced_total_area : nil,
           reduction_enabled: multi_reduction_enabled,
           global_hl_on: has_global_hl
         }
         multi_data[:funcs] = all_funcs if type == 'bldg'
+        multi_data[:density_mode] = self.get_density_mode if type == 'site'
         @dialog_stats.execute_script("refreshUI('#{type}', 'multi', [], [], #{multi_data.to_json})")
       end
     end

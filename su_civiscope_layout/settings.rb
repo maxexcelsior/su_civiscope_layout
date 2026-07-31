@@ -128,31 +128,35 @@ module CiviscopeLayout
     ].freeze
 
     DEFAULT_TOWER_REDUCTION = [
-      [100, 0.95],
-      [150, 0.92],
-      [200, 0.89],
-      [250, 0.86],
-      [300, 0.83],
-      [350, 0.79],
-      [400, 0.76],
-      [450, 0.73],
-      [500, 0.70]
+      [100, 0.90],
+      [150, 0.88125],
+      [200, 0.8625],
+      [250, 0.84375],
+      [300, 0.825],
+      [350, 0.80625],
+      [400, 0.7875],
+      [450, 0.76875],
+      [500, 0.75]
     ].freeze
+
+    DEFAULT_UNDERGROUND_REDUCTION = 0.95
 
     def self.get_reduction_settings
       config = self.load_config
       {
         "enabled" => config["reduction_enabled"] || false,
         "podium_reduction" => config["podium_reduction"] || DEFAULT_PODIUM_REDUCTION,
-        "tower_reduction" => config["tower_reduction"] || DEFAULT_TOWER_REDUCTION
+        "tower_reduction" => config["tower_reduction"] || DEFAULT_TOWER_REDUCTION,
+        "underground_reduction" => config["underground_reduction"] || DEFAULT_UNDERGROUND_REDUCTION
       }
     end
 
-    def self.save_reduction_settings(enabled, podium_arr, tower_arr)
+    def self.save_reduction_settings(enabled, podium_arr, tower_arr, underground_coeff = nil)
       config = self.load_config
       config["reduction_enabled"] = enabled ? true : false
       config["podium_reduction"] = podium_arr
       config["tower_reduction"] = tower_arr
+      config["underground_reduction"] = underground_coeff.to_f if underground_coeff
       self.save_config(config)
     end
 
@@ -161,10 +165,15 @@ module CiviscopeLayout
       settings = self.get_reduction_settings
       return 1.0 unless settings['enabled']
 
-      intervals = case bldg_type
-      when '裙楼' then settings['podium_reduction']
-      when '塔楼', '独立' then settings['tower_reduction']
-      else return 1.0
+      case bldg_type
+      when '裙楼'
+        intervals = settings['podium_reduction']
+      when '塔楼', '独立'
+        intervals = settings['tower_reduction']
+      when '地下空间'
+        return settings['underground_reduction'].to_f
+      else
+        return 1.0
       end
 
       return 1.0 if intervals.nil? || intervals.empty?
@@ -209,6 +218,18 @@ module CiviscopeLayout
     def self.save_overlay_bldg_settings(data)
       config = self.load_config
       config["bldg_overlay_offset"] = data["offset"].to_f
+      self.save_config(config)
+    end
+
+    # 密度计算模式
+    def self.get_density_mode
+      config = self.load_config
+      config["density_mode"] || "manual"
+    end
+
+    def self.save_density_mode(mode)
+      config = self.load_config
+      config["density_mode"] = mode
       self.save_config(config)
     end
 
@@ -324,10 +345,10 @@ module CiviscopeLayout
         @dialog_settings.execute_script("renderReductionSettings(#{rs.to_json})")
       end
 
-      @dialog_settings.add_action_callback("save_reduction_settings") do |_, enabled, podium_json, tower_json|
+      @dialog_settings.add_action_callback("save_reduction_settings") do |_, enabled, podium_json, tower_json, underground_coeff|
         podium_arr = JSON.parse(podium_json)
         tower_arr = JSON.parse(tower_json)
-        self.save_reduction_settings(enabled, podium_arr, tower_arr)
+        self.save_reduction_settings(enabled, podium_arr, tower_arr, underground_coeff)
       end
 
       @dialog_settings.set_on_closed { @dialog_settings = nil }

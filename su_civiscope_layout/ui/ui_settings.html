@@ -148,6 +148,16 @@
         </table>
         <button class="cp-btn secondary" style="width:100%; margin-top:8px; font-size:11px;" onclick="addReductionRow('podium')">+ 追加区间</button>
       </div>
+
+      <h4 style="font-size:13px; color:#6c757d; margin:15px 0 8px 0;">地下空间 — 折减系数</h4>
+      <div class="card-simple" style="padding:15px; background:#f9f9f9; border-radius:8px;">
+        <label style="font-size:12px; color:#555; display:flex; align-items:center; gap:10px;">
+          折减系数：
+          <input type="number" id="underground-reduction" min="0" max="100" step="1" value="95" style="width:80px; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:13px;" onchange="saveReductionState()">
+          <span style="color:#888;">%</span>
+          <span style="font-size:11px; color:#999;">（地下空间不按高度折减，统一使用固定系数）</span>
+        </label>
+      </div>
     </div>
 
     <div id="tab-overlay" class="tab-content">
@@ -612,11 +622,12 @@
     }
 
     // ========== 计容面积折减设置 ==========
-    let reductionData = { enabled: false, podium_reduction: [], tower_reduction: [] };
+    let reductionData = { enabled: false, podium_reduction: [], tower_reduction: [], underground_reduction: 0.95 };
 
     function renderReductionSettings(data) {
       reductionData = data;
       document.getElementById('reduction-enabled').checked = data.enabled;
+      document.getElementById('underground-reduction').value = Math.round((data.underground_reduction || 0.95) * 100);
       renderReductionTable('tower', data.tower_reduction);
       renderReductionTable('podium', data.podium_reduction);
     }
@@ -632,7 +643,7 @@
       intervals.forEach(function(entry, idx) {
         let maxH = entry[0];
         let coeff = entry[1];
-        let pct = (coeff * 100).toFixed(0);
+        let pct = (coeff * 100).toFixed(2);
         let bracket = idx === 0 ? '[' : '(';
         html += `<tr style="border-bottom:1px solid #eee;">
           <td style="padding:4px;">
@@ -640,7 +651,7 @@
             <span style="font-weight:bold;">${maxH}</span><span style="color:#888;">]</span>
           </td>
           <td style="text-align:right; padding:4px;">
-            <input type="number" value="${pct}" min="0" max="100" step="1" style="width:55px; padding:3px; border:1px solid #ccc; border-radius:3px; text-align:right;"
+            <input type="number" value="${pct}" min="0" max="100" step="0.01" style="width:55px; padding:3px; border:1px solid #ccc; border-radius:3px; text-align:right;"
               onchange="updateReductionInterval('${type}', ${idx}, 1, this.value / 100)">
             <span style="color:#888;">%</span>
           </td>
@@ -687,10 +698,12 @@
 
     function saveReductionState() {
       try {
+        var underground = parseFloat(document.getElementById('underground-reduction').value || 95) / 100;
         sketchup.save_reduction_settings(
           reductionData.enabled,
           JSON.stringify(reductionData.podium_reduction),
-          JSON.stringify(reductionData.tower_reduction)
+          JSON.stringify(reductionData.tower_reduction),
+          underground
         );
       } catch(e) {}
     }

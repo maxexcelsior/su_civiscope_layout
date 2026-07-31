@@ -7,6 +7,12 @@ module CiviscopeLayout
       model.layers[layer_name] || model.layers.add(layer_name)
     end
 
+    def self.update_bldg_layer(entity)
+      bldg_type = entity.get_attribute("dynamic_attributes", "bldg_type") || ""
+      target_layer = bldg_type == '地下空间' ? "CIM-mass-ug" : "CIM-mass"
+      entity.layer = self.ensure_layer(target_layer)
+    end
+
     def self.get_short_id(t)
       return "0" unless t
       t.persistent_id != 0 ? t.persistent_id.to_s : t.guid.split('-').first

@@ -121,6 +121,22 @@ module CiviscopeLayout
       end
     end
 
+    # 计算自动模式密度所用的基底面积（仅统计紧贴地块地面的建筑）
+    def self.compute_auto_base_area(site_entity, bldg_entities)
+      return 0.0 if bldg_entities.empty?
+      site_bottom_z = self.get_world_z(site_entity, :bottom)
+      threshold = 0.5  # 米，与地块地面高差在此范围内视为"紧贴"
+      ground_bldgs = if site_bottom_z
+        bldg_entities.select do |b|
+          b_bottom_z = self.get_world_z(b, :bottom)
+          b_bottom_z && (b_bottom_z - site_bottom_z).abs <= threshold
+        end
+      else
+        bldg_entities  # 无法获取地块地面高度时回退到全部建筑
+      end
+      ground_bldgs.sum { |b| b.get_attribute("dynamic_attributes", "base_area").to_f }
+    end
+
     def self.calc_site_data(entity, skip_operation = false)
       return unless entity.valid?
       

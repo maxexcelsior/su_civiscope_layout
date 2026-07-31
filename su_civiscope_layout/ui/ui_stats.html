@@ -475,7 +475,7 @@
       <div class="card">
         <div class="title">基本信息
           <span style="display:flex; align-items:center; gap:6px;">
-            <button id="btn-bldg-show-number" class="toolbar-btn" style="padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleBldgNumber()">显示编号</button>
+            <button id="btn-bldg-show-number" class="toolbar-btn" style="flex:none; padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleBldgNumber()">显示建筑编号</button>
             <span class="id-badge" id="bldg-id">ID: --</span>
           </span>
         </div>
@@ -487,6 +487,7 @@
               <option value="塔楼">塔楼</option>
               <option value="裙楼">裙楼</option>
               <option value="独立">独立</option>
+              <option value="地下空间">地下空间</option>
             </select></div>
         </div>
       </div>
@@ -604,7 +605,7 @@
       <div class="card">
         <div class="title" style="border-left-color: #2e7d32; display:flex; align-items:center; justify-content:space-between;">
           <span>BP组概览 <span class="bp-tag">只读预览</span></span>
-          <button id="btn-bp-show-number" class="toolbar-btn" style="padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleBpSiteNumber()">显示编号</button>
+          <button id="btn-bp-show-number" class="toolbar-btn" style="flex:none; padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleBpSiteNumber()">显示地块编号</button>
         </div>
         <span id="bp-site-id" style="display:none;"></span>
         <div class="readonly-grid">
@@ -665,7 +666,7 @@
             id="site-id">ID: --</span></div>
         <div class="row"><span class="data-label">编号：</span>
           <div style="display:flex; gap:6px; align-items:center;">
-            <button id="btn-show-number" class="toolbar-btn" style="padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleSiteNumber(null, this)">显示编号</button>
+            <button id="btn-show-number" class="toolbar-btn" style="flex:none; padding:0 8px; font-size:11px; min-width:60px; line-height:24px;" onclick="toggleSiteNumber(null, this)">显示地块编号</button>
             <input type="text" id="site-no" placeholder="如 A-01" onchange="updateSite()">
           </div>
         </div>
@@ -677,7 +678,7 @@
       <div class="card">
         <div class="title" style="border-left-color: #28a745;">
           控规指标
-          <button id="btn-hl-check" class="toolbar-btn" style="padding:0 8px; font-size:11px; line-height:24px;" onclick="toggleHeightCheck()">📏 开启检测</button>
+          <button id="btn-hl-check" class="toolbar-btn" style="flex:none; padding:0 8px; font-size:11px; line-height:24px;" onclick="toggleHeightCheck()">📏 开启检测</button>
         </div>
         <div class="row"><span class="data-label">地块限高(m)：</span>
           <div style="display:flex; gap:6px; align-items:center;">
@@ -698,8 +699,18 @@
           <span style="font-weight:bold;">容积率（折减后）：</span><span class="highlight" style="color: #ff9800;"><span id="site-reduced-far">0.00</span></span>
         </div>
         <div class="row field-box" style="margin-bottom:8px;">
-          <span style="font-weight:bold;">建筑密度：</span><span class="highlight" style="color: #28a745;"><span
-              id="site-density">0.0</span> %</span>
+          <span style="display:flex; align-items:center; gap:2px;">
+            <span style="font-weight:bold;">建筑密度</span>
+            <select id="density-mode-select" style="width:auto; font-size:inherit; padding:0 2px; margin:0; border:1px solid #ddd; border-radius:3px;" onchange="onDensityModeChange(this.value)">
+              <option value="manual">手动</option>
+              <option value="auto">自动</option>
+            </select>
+            <span style="font-weight:bold;">：</span>
+          </span>
+          <span class="highlight" style="color: #28a745;"><span id="site-density">0.0</span> %</span>
+        </div>
+        <div class="row field-box" style="margin-bottom:8px;">
+          <span style="font-weight:bold;">建筑高度：</span><span class="highlight" style="color: #28a745;"><span id="site-max-height">0.0</span> m</span>
         </div>
         <div class="row field-box" style="margin-bottom:0;">
           <span style="font-weight:bold;">绿地率：</span><span class="highlight" style="color: #28a745;"><span
@@ -707,7 +718,7 @@
         </div>
       </div>
       <div class="card" id="site-bldgs-card" style="display:none;">
-        <div class="title" style="border-left-color: #ffc107;">地块内包含的建筑实体</div>
+        <div class="title" style="border-left-color: #ffc107;">地块内包含的建筑实体 <span style="font-size:12px; color:#888; font-weight:normal;">建筑实体总数：<span id="site-bldgs-count">0</span></span></div>
         <table class="multi-table" style="margin-bottom: 0;">
           <thead>
             <tr>
@@ -719,6 +730,9 @@
                   <div class="filter-option" onclick="applyFilter('type', '全部')">全部</div>
                   <div class="filter-option" onclick="applyFilter('type', '塔楼')">塔楼</div>
                   <div class="filter-option" onclick="applyFilter('type', '板楼')">板楼</div>
+                  <div class="filter-option" onclick="applyFilter('type', '裙楼')">裙楼</div>
+                  <div class="filter-option" onclick="applyFilter('type', '独立')">独立</div>
+                  <div class="filter-option" onclick="applyFilter('type', '地下空间')">地下空间</div>
                 </div>
               </th>
               <th>
@@ -738,6 +752,16 @@
                 style="text-align:right; border-top: 2px solid #ddd; padding-top: 5px; color:#ffc107;">0.00</th>
               <th id="site-bldgs-reduced-total"
                 style="text-align:right; border-top: 2px solid #ddd; padding-top: 5px; color:#ff9800; display:none;">0.00</th>
+            </tr>
+            <tr>
+              <th colspan="3" style="text-align:left; padding-top:3px; color:#666; font-weight:normal; font-size:11px;">地上总计容建筑面积(m²)</th>
+              <th id="site-bldgs-above-total" style="text-align:right; padding-top:3px; color:#666; font-weight:normal; font-size:11px;">0.00</th>
+              <th id="site-bldgs-above-reduced" style="text-align:right; padding-top:3px; color:#ff9800; font-weight:normal; font-size:11px; display:none;">0.00</th>
+            </tr>
+            <tr>
+              <th colspan="3" style="text-align:left; padding-top:3px; color:#666; font-weight:normal; font-size:11px;">地下总计容建筑面积(m²)</th>
+              <th id="site-bldgs-below-total" style="text-align:right; padding-top:3px; color:#666; font-weight:normal; font-size:11px;">0.00</th>
+              <th id="site-bldgs-below-reduced" style="text-align:right; padding-top:3px; color:#ff9800; font-weight:normal; font-size:11px; display:none;">0.00</th>
             </tr>
           </tfoot>
         </table>
@@ -775,6 +799,14 @@
       <div class="row" id="site-total-reduced-gfa-row" style="display:none;">
         <span style="font-weight:bold; font-size:14px;">总计容建筑面积（折减后）：</span>
         <span class="highlight" style="color: #ff9800;"><span id="site-total-reduced-gfa">0.00</span> m²</span>
+      </div>
+      <div class="row" id="site-total-above-reduced-row" style="display:none;">
+        <span style="font-weight:bold; font-size:13px; padding-left:20px; color:#666;">地上总计容建筑面积（折减后）：</span>
+        <span style="color:#ff9800;"><span id="site-total-above-reduced">0.00</span> m²</span>
+      </div>
+      <div class="row" id="site-total-below-reduced-row" style="display:none;">
+        <span style="font-weight:bold; font-size:13px; padding-left:20px; color:#666;">地下总计容建筑面积（折减后）：</span>
+        <span style="color:#ff9800;"><span id="site-total-below-reduced">0.00</span> m²</span>
       </div>
     </div>
   </div>
@@ -850,6 +882,8 @@
         document.getElementById('site-bldgs-card').style.display = 'none';
         return;
       }
+      var cntEl = document.getElementById('site-bldgs-count');
+      if (cntEl) cntEl.innerText = currentBldgsData.length;
 
       var hasReduced = currentBldgsData[0].reduced_area != null;
 
@@ -891,6 +925,44 @@
       if (hasReduced) {
         document.getElementById('site-bldgs-reduced-total').innerText = tReducedArea.toFixed(2);
       }
+
+      // 地上/地下统计（基于全部未筛选数据）
+      var aboveGfa = 0, belowGfa = 0;
+      var aboveReduced = 0, belowReduced = 0;
+      var hasRed = currentBldgsData[0] && currentBldgsData[0].reduced_area != null;
+      currentBldgsData.forEach(function(b) {
+        var a = parseFloat(b.area || 0);
+        if (b.type === '地下空间') {
+          belowGfa += a;
+          if (hasRed) belowReduced += parseFloat(b.reduced_area || 0);
+        } else {
+          aboveGfa += a;
+          if (hasRed) aboveReduced += parseFloat(b.reduced_area || 0);
+        }
+      });
+      var aboveEl = document.getElementById('site-bldgs-above-total');
+      var belowEl = document.getElementById('site-bldgs-below-total');
+      var aboveReducedEl = document.getElementById('site-bldgs-above-reduced');
+      var belowReducedEl = document.getElementById('site-bldgs-below-reduced');
+      if (aboveEl) aboveEl.innerText = aboveGfa.toFixed(2);
+      if (belowEl) belowEl.innerText = belowGfa.toFixed(2);
+      if (aboveReducedEl) {
+        if (hasRed) {
+          aboveReducedEl.style.display = '';
+          aboveReducedEl.innerText = aboveReduced.toFixed(2);
+        } else {
+          aboveReducedEl.style.display = 'none';
+        }
+      }
+      if (belowReducedEl) {
+        if (hasRed) {
+          belowReducedEl.style.display = '';
+          belowReducedEl.innerText = belowReduced.toFixed(2);
+        } else {
+          belowReducedEl.style.display = 'none';
+        }
+      }
+
       document.getElementById('site-bldgs-card').style.display = 'block';
     }
     
@@ -1024,8 +1096,8 @@
       // 即时切换按钮状态，无需等待 Ruby 回调刷新
       let btn = btnElement || document.getElementById('btn-show-number');
       if (btn) {
-        let showing = btn.innerText === '隐藏编号';
-        btn.innerText = showing ? '显示编号' : '隐藏编号';
+        let showing = btn.innerText === '隐藏地块编号';
+        btn.innerText = showing ? '显示地块编号' : '隐藏地块编号';
         if (showing) btn.classList.remove('active'); else btn.classList.add('active');
       }
       sketchup.toggle_site_number(idStr);
@@ -1038,12 +1110,15 @@
       if (showing) btn.classList.remove('active'); else btn.classList.add('active');
       sketchup.batch_toggle_site_number(JSON.stringify(window._currentMultiSiteIds));
     }
+    function onDensityModeChange(mode) {
+      sketchup.set_density_mode(mode);
+    }
     function toggleBldgNumber() {
       let idStr = document.getElementById('bldg-id').innerText.replace("ID: ", "").trim();
       let btn = document.getElementById('btn-bldg-show-number');
       if (btn) {
-        let showing = btn.innerText === '隐藏编号';
-        btn.innerText = showing ? '显示编号' : '隐藏编号';
+        let showing = btn.innerText === '隐藏建筑编号';
+        btn.innerText = showing ? '显示建筑编号' : '隐藏建筑编号';
         if (showing) btn.classList.remove('active'); else btn.classList.add('active');
       }
       sketchup.toggle_bldg_number(idStr);
@@ -1054,8 +1129,8 @@
       // 即时切换按钮状态
       let btn = document.getElementById('btn-bp-show-number');
       if (btn) {
-        let showing = btn.innerText === '隐藏编号';
-        btn.innerText = showing ? '显示编号' : '隐藏编号';
+        let showing = btn.innerText === '隐藏地块编号';
+        btn.innerText = showing ? '显示地块编号' : '隐藏地块编号';
         if (showing) btn.classList.remove('active'); else btn.classList.add('active');
       }
       sketchup.toggle_site_number(idStr);
@@ -1147,10 +1222,10 @@
             let bldgNumBtn = document.getElementById('btn-bldg-show-number');
             if (bldgNumBtn) {
               if (data.is_showing_number) {
-                bldgNumBtn.innerText = "隐藏编号";
+                bldgNumBtn.innerText = "隐藏建筑编号";
                 bldgNumBtn.classList.add('active');
               } else {
-                bldgNumBtn.innerText = "显示编号";
+                bldgNumBtn.innerText = "显示建筑编号";
                 bldgNumBtn.classList.remove('active');
               }
             }
@@ -1175,10 +1250,10 @@
             let numBtn = document.getElementById('btn-show-number');
             if (numBtn) {
               if (data.is_showing_number) {
-                numBtn.innerText = "隐藏编号";
+                numBtn.innerText = "隐藏地块编号";
                 numBtn.classList.add('active');
               } else {
-                numBtn.innerText = "显示编号";
+                numBtn.innerText = "显示地块编号";
                 numBtn.classList.remove('active');
               }
             }
@@ -1210,14 +1285,20 @@
               renderBldgsList();
 
               if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = (data.far || 0).toFixed(2); }
-              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = (data.density || 0).toFixed(1); }
+              var denMode = data.density_mode || 'manual';
+              var siteDensity = denMode === 'auto' ? (data.density_auto || 0) : (data.density_manual || 0);
+              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = parseFloat(siteDensity).toFixed(1); }
+              if (document.getElementById('site-max-height')) { document.getElementById('site-max-height').innerText = (data.max_bldg_height || 0).toFixed(1); }
               if (document.getElementById('site-green-rate')) { document.getElementById('site-green-rate').innerText = (data.green_rate || 0).toFixed(1); }
               if (document.getElementById('site-green-m2')) { document.getElementById('site-green-m2').innerText = (data.green_m2 || 0).toFixed(2); }
             } else {
               currentBldgsData = [];
               if (document.getElementById('site-bldgs-card')) document.getElementById('site-bldgs-card').style.display = 'none';
               if (document.getElementById('site-far')) { document.getElementById('site-far').innerText = (data.far || 0).toFixed(2); }
-              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = (data.density || 0).toFixed(1); }
+              var denMode2 = data.density_mode || 'manual';
+              var siteDensity2 = denMode2 === 'auto' ? (data.density_auto || 0) : (data.density_manual || 0);
+              if (document.getElementById('site-density')) { document.getElementById('site-density').innerText = parseFloat(siteDensity2).toFixed(1); }
+              if (document.getElementById('site-max-height')) { document.getElementById('site-max-height').innerText = "0.0"; }
               if (document.getElementById('site-green-rate')) { document.getElementById('site-green-rate').innerText = (data.green_rate || 0).toFixed(1); }
               if (document.getElementById('site-green-m2')) { document.getElementById('site-green-m2').innerText = (data.green_m2 || 0).toFixed(2); }
             }
@@ -1233,10 +1314,10 @@
             let bldgNumBtn = document.getElementById('btn-bldg-show-number');
             if (bldgNumBtn) {
               if (data.is_showing_number) {
-                bldgNumBtn.innerText = "隐藏编号";
+                bldgNumBtn.innerText = "隐藏建筑编号";
                 bldgNumBtn.classList.add('active');
               } else {
-                bldgNumBtn.innerText = "显示编号";
+                bldgNumBtn.innerText = "显示建筑编号";
                 bldgNumBtn.classList.remove('active');
               }
             }
@@ -1251,7 +1332,9 @@
 
           document.getElementById('bp-gfa').innerText = (data.gfa || 0).toFixed(2);
           document.getElementById('bp-far').innerText = (data.far || 0).toFixed(2);
-          document.getElementById('bp-density').innerText = (data.density || 0).toFixed(1) + "%";
+          var bpDenMode = data.density_mode || 'manual';
+          var bpDensity = bpDenMode === 'auto' ? (data.density_auto || 0) : (data.density_manual || 0);
+          document.getElementById('bp-density').innerText = parseFloat(bpDensity).toFixed(1) + "%";
           document.getElementById('bp-green-rate').innerText = (data.green_rate || 0).toFixed(1);
           document.getElementById('bp-green-m2').innerText = (data.green_m2 || 0).toFixed(2);
 
@@ -1270,10 +1353,10 @@
           let bpNumBtn = document.getElementById('btn-bp-show-number');
           if (bpNumBtn) {
             if (data.is_showing_number) {
-              bpNumBtn.innerText = "隐藏编号";
+              bpNumBtn.innerText = "隐藏地块编号";
               bpNumBtn.classList.add('active');
             } else {
-              bpNumBtn.innerText = "显示编号";
+              bpNumBtn.innerText = "显示地块编号";
               bpNumBtn.classList.remove('active');
             }
           }
@@ -1305,7 +1388,7 @@
                   listHtml += `<td style="text-align:center; color:#ff9800; font-weight:bold;">${parseFloat(item.reduced_gfa || 0).toFixed(2)}</td>`;
                 }
                 listHtml += `<td style="text-align:center;">${item.far}</td>
-                  <td style="text-align:center;">${item.density}%</td>
+                  <td style="text-align:center;">${(function(){var m=data.density_mode||'manual';var v=m==='auto'?(item.density_auto||0):(item.density_manual||0);return parseFloat(v).toFixed(1);})()}%</td>
                   <td style="text-align:center; color:#388e3c;">${item.green_rate}%</td>
                 </tr>`;
               }
@@ -1374,6 +1457,20 @@
             } else if (totalReducedGfaRow) {
               totalReducedGfaRow.style.display = 'none';
             }
+            var totalAboveReducedRow = document.getElementById('site-total-above-reduced-row');
+            if (totalAboveReducedRow && data.reduction_enabled && data.totalAboveReducedGfa != null) {
+              totalAboveReducedRow.style.display = 'flex';
+              document.getElementById('site-total-above-reduced').innerText = parseFloat(data.totalAboveReducedGfa || 0).toFixed(2);
+            } else if (totalAboveReducedRow) {
+              totalAboveReducedRow.style.display = 'none';
+            }
+            var totalBelowReducedRow = document.getElementById('site-total-below-reduced-row');
+            if (totalBelowReducedRow && data.reduction_enabled && data.totalBelowReducedGfa != null) {
+              totalBelowReducedRow.style.display = 'flex';
+              document.getElementById('site-total-below-reduced').innerText = parseFloat(data.totalBelowReducedGfa || 0).toFixed(2);
+            } else if (totalBelowReducedRow) {
+              totalBelowReducedRow.style.display = 'none';
+            }
             // 保存站点 ID 列表用于批量切换
             if (data.list) {
               window._currentMultiSiteIds = data.list.map(item => item.id);
@@ -1386,6 +1483,10 @@
             }
           }
         }
+
+        // Sync density mode selector with server data
+        var denSelect = document.getElementById('density-mode-select');
+        if (denSelect && data.density_mode) denSelect.value = data.density_mode;
       } catch (e) {
         console.error("UI Refresh Error:", e);
       }
