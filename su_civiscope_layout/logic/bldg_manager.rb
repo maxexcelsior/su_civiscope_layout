@@ -127,7 +127,7 @@ module CiviscopeLayout
         bb1[3] + tolerance < bb2[2] || bb2[3] + tolerance < bb1[2])
     end
 
-    # 递归查找实体下方所有叠放的CIM体块（不限类型），返回高度数组
+    # 递归查找实体下方所有叠放的CIM体块（排除地下空间），返回高度数组
     def self.find_buildings_under_entity(entity, visited = [])
       return [] if visited.include?(entity)
       visited << entity
@@ -140,6 +140,10 @@ module CiviscopeLayout
 
       self.find_sibling_buildings(entity).each do |sibling|
         next if visited.include?(sibling)
+
+        # 地下空间体块高度不计入建筑真高
+        sibling_type = sibling.get_attribute("dynamic_attributes", "bldg_type") || "塔楼"
+        next if sibling_type == "地下空间"
 
         sibling_world_top = self.get_world_z(sibling, :top)
         next if sibling_world_top.nil?
